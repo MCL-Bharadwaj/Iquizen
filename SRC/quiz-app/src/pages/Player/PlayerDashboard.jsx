@@ -1,0 +1,280 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { BookOpen, Clock, TrendingUp, Award, Play, Loader2 } from 'lucide-react';
+import { quizApi, attemptApi, helpers } from '../../services/api';
+
+const PlayerDashboard = ({ isDark }) => {
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalQuizzes: 0,
+    completedAttempts: 0,
+    inProgressAttempts: 0,
+    averageScore: 0,
+  });
+  const [recentQuizzes, setRecentQuizzes] = useState([]);
+  const [recentAttempts, setRecentAttempts] = useState([]);
+  const userId = helpers.getUserId('Player');
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  // Refresh data when component becomes visible (user navigates back)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('Dashboard became visible, refreshing data...');
+        fetchDashboardData();
+      }
+    };
+
+    const handleFocus = () => {
+      console.log('Dashboard received focus, refreshing data...');
+      fetchDashboardData();
+    };
+
+    // Also listen for navigation events
+    const handleNavigation = () => {
+      console.log('Navigation detected, refreshing dashboard...');
+      fetchDashboardData();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('popstate', handleNavigation);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('popstate', handleNavigation);
+    };
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch available quizzes
+      const quizzesData = await quizApi.getQuizzes({ limit: 10 });
+      console.log('Quizzes data:', quizzesData); // Debug log
+      setRecentQuizzes(quizzesData.data || []); // Backend returns 'data' array
+
+      // Fetch user attempts
+      const attemptsData = await attemptApi.getUserAttempts(userId);
+      console.log('Attempts data:', attemptsData); // Debug log
+      console.log('Total attempts received:', attemptsData.attempts?.length);
+      
+      const attempts = attemptsData.attempts || [];
+      console.log('Attempts array:', attempts);
+      console.log('Status breakdown:', {
+        total: attempts.length,
+        inProgress: attempts.filter(a => a.status === 'in_progress').length,
+        completed: attempts.filter(a => a.status === 'completed').length,
+        statuses: attempts.map(a => ({ id: a.attemptId, status: a.status }))
+      });
+      
+      setRecentAttempts(attempts.slice(0, 5));
+
+      // Calculate stats
+      const attemptStats = helpers.calculateAttemptStats(attempts);
+      console.log('Calculated stats:', attemptStats);
+      
+      setStats({
+        totalQuizzes: quizzesData.count || 0,
+        completedAttempts: attemptStats.completed,
+        inProgressAttempts: attemptStats.inProgress,
+        averageScore: attemptStats.averageScore,
+      });
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className={`w-12 h-12 animate-spin ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-8 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className={`text-4xl font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+          Player Dashboard
+        </h1>
+        <p className={`text-lg ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+          Welcome back! Ready to learn?
+        </p>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <StatCard
+          icon={BookOpen}
+          label="Available Quizzes"
+          value={stats.totalQuizzes}
+          gradient="from-blue-500 to-cyan-600"
+          isDark={isDark}
+          onClick={() => navigate('/Player/quizzes')}
+        />
+        <StatCard
+          icon={Clock}
+          label="In Progress"
+          value={stats.inProgressAttempts}
+          gradient="from-orange-500 to-red-600"
+          isDark={isDark}
+          onClick={() => navigate('/Player/attempts?filter=in_progress')}
+        />
+        <StatCard
+          icon={Award}
+          label="Completed"
+          value={stats.completedAttempts}
+          gradient="from-green-500 to-emerald-600"
+          isDark={isDark}
+          onClick={() => navigate('/Player/attempts?filter=completed')}
+        />
+        <StatCard
+          icon={TrendingUp}
+          label="Average Score"
+          value={`${stats.averageScore}%`}
+          gradient="from-purple-500 to-pink-600"
+          isDark={isDark}
+        />
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Recent Quizzes */}
+        <div className={`rounded-2xl ${isDark ? 'bg-gray-800' : 'bg-white'} p-6 shadow-lg`}>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+              Available Quizzes
+            </h2>
+            <button
+              onClick={() => navigate('/Player/quizzes')}
+              className="text-blue-500 hover:text-blue-600 font-medium text-sm"
+            >
+              View All
+            </button>
+          </div>
+          <div className="space-y-3">
+            {recentQuizzes.slice(0, 5).map((quiz) => (
+              <div
+                key={quiz.quizId}
+                className={`p-4 rounded-xl ${isDark ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-50 hover:bg-gray-100'} transition-colors cursor-pointer`}
+                onClick={() => navigate(`/Player/quiz/${quiz.quizId}`)}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <h3 className={`font-semibold mb-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      {quiz.title}
+                    </h3>
+                    <div className="flex items-center gap-3 text-sm">
+                      <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                        {quiz.estimatedMinutes || 0} mins
+                      </span>
+                      <span className={`px-2 py-1 rounded text-xs ${
+                        quiz.difficulty === 'easy' ? 'bg-green-500/20 text-green-400' :
+                        quiz.difficulty === 'hard' ? 'bg-red-500/20 text-red-400' :
+                        'bg-yellow-500/20 text-yellow-400'
+                      }`}>
+                        {quiz.difficulty || 'medium'}
+                      </span>
+                    </div>
+                  </div>
+                  <Play className="w-5 h-5 text-blue-500" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Recent Attempts */}
+        <div className={`rounded-2xl ${isDark ? 'bg-gray-800' : 'bg-white'} p-6 shadow-lg`}>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+              My Recent Attempts
+            </h2>
+            <button
+              onClick={() => navigate('/Player/attempts')}
+              className="text-blue-500 hover:text-blue-600 font-medium text-sm"
+            >
+              View All
+            </button>
+          </div>
+          {recentAttempts.length > 0 ? (
+            <div className="space-y-3">
+              {recentAttempts.map((attempt) => (
+                <div
+                  key={attempt.attemptId}
+                  className={`p-4 rounded-xl ${isDark ? 'bg-gray-700' : 'bg-gray-50'}`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={`font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      Quiz Attempt
+                    </span>
+                    <span className={`text-xs px-2 py-1 rounded ${
+                      attempt.status === 'completed' 
+                        ? 'bg-green-500/20 text-green-400'
+                        : 'bg-blue-500/20 text-blue-400'
+                    }`}>
+                      {attempt.status}
+                    </span>
+                  </div>
+                  {attempt.status === 'completed' && attempt.scorePercentage !== null && (
+                    <div className="flex items-center gap-2">
+                      <div className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                        {Math.round(attempt.scorePercentage)}%
+                      </div>
+                      <span className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                        Score
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <Clock className={`w-12 h-12 mx-auto mb-3 ${isDark ? 'text-gray-600' : 'text-gray-300'}`} />
+              <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                No attempts yet. Start a quiz!
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const StatCard = ({ icon: Icon, label, value, gradient, isDark, onClick }) => {
+  return (
+    <div 
+      className={`rounded-2xl ${isDark ? 'bg-gray-800' : 'bg-white'} p-6 shadow-lg ${onClick ? 'cursor-pointer hover:shadow-xl transform hover:scale-105 transition-all duration-200' : ''}`}
+      onClick={onClick}
+    >
+      <div className="flex items-center justify-between">
+        <div>
+          <p className={`text-sm mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+            {label}
+          </p>
+          <p className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+            {value}
+          </p>
+        </div>
+        <div className={`p-4 rounded-2xl bg-gradient-to-br ${gradient}`}>
+          <Icon className="w-8 h-8 text-white" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default PlayerDashboard;

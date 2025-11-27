@@ -1,0 +1,46 @@
+# Quick Guide: Format Your Quiz Questions
+
+## ✅ The Feature is Working!
+Question 2 shows formatted because it already has backticks in the database.
+
+## To Format Other Questions:
+
+### Format the question text like this:
+
+**Instead of:**
+```
+What will this code print? print("Score:", 10)
+```
+
+**Use this format:**
+```
+What will this code print?
+
+```python
+print("Score:", 10)
+```
+(close with three backticks)
+```
+
+### How to Update in Database:
+
+1. Connect to your PostgreSQL database
+2. Update the `question_text` field in `quiz.questions` table
+3. Wrap code sections with triple backticks
+
+### Example SQL Update:
+```sql
+UPDATE quiz.questions
+SET question_text = 'What will this code print?
+
+```python
+print("Score:", 10)
+```'
+WHERE question_id = 'your-question-id-here';
+```
+
+## 🎯 The formatting works automatically when you use:
+- Triple backticks (```) for code blocks
+- Single backticks (`) for inline code like `print()` or `input()`
+
+Your implementation is complete and working!
