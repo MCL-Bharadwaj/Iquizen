@@ -15,7 +15,8 @@ import {
   Sun,
   ChevronRight,
   GraduationCap,
-  RefreshCw
+  RefreshCw,
+  HelpCircle
 } from 'lucide-react';
 
 const Sidebar = ({ isDark, toggleTheme, role = 'Player' }) => {
@@ -33,6 +34,7 @@ const Sidebar = ({ isDark, toggleTheme, role = 'Player' }) => {
     creator: [
       { icon: Home, label: 'Dashboard', path: '/creator/dashboard' },
       { icon: BookOpen, label: 'All Quizzes', path: '/creator/quizzes' },
+      { icon: HelpCircle, label: 'Questions', path: '/creator/questions' },
       { icon: PenTool, label: 'Create Quiz', path: '/creator/quiz/create' },
     ],
   };

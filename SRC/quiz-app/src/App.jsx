@@ -24,6 +24,9 @@ import CreatorQuizzes from './pages/ContentCreator/CreatorQuizzes';
 import CreatorCreateQuiz from './pages/ContentCreator/CreatorCreateQuiz';
 import CreatorManageQuestions from './pages/ContentCreator/CreatorManageQuestions';
 
+// Questions Page
+import Questions from './pages/Questions';
+
 // Landing Page
 import RoleSelector from './pages/RoleSelector';
 
@@ -96,6 +99,7 @@ function App() {
                     <Route path="/quizzes" element={<CreatorQuizzes isDark={isDark} />} />
                     <Route path="/quiz/create" element={<CreatorCreateQuiz isDark={isDark} />} />
                     <Route path="/quiz/:quizId/questions" element={<CreatorManageQuestions isDark={isDark} />} />
+                    <Route path="/questions" element={<Questions isDark={isDark} />} />
                   </Routes>
                 </ResponsiveLayout>
               </div>

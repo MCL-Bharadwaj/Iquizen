@@ -1,0 +1,41 @@
+Endpoint Name,HTTP Method,Route,Allowed Roles,Description,Category
+CreateQuiz,POST,/api/quizzes,"Tutors, Content Creator, Administrator",Create a new quiz,Quiz Management
+UpdateQuiz,PUT,/api/quizzes/{quizId},"Administrator, Content Creator",Update an existing quiz,Quiz Management
+DeleteQuiz,DELETE,/api/quizzes/{quizId},"Administrator, Content Creator",Soft deletes a quiz (sets deleted_at timestamp),Quiz Management
+GetQuizzes,GET,/api/quizzes,"Administrator, Student, Tutors, Content Creator, Player",Get all published quizzes with optional filtering,Quiz Management
+GetQuizById,GET,/api/quizzes/{quizId},"Administrator, Student, Tutors, Content Creator, Player",Get quiz by ID with detailed information,Quiz Management
+CreateQuestion,POST,/api/questions,"Administrator, Content Creator, Tutors",Create a new question,Question Management
+DeleteQuestion,DELETE,/api/questions/{questionId},"Administrator, Content Creator",Soft deletes a question,Question Management
+AddQuestionToQuiz,POST,/api/quizzes/{quizId}/questions,"Administrator, Content Creator",Add a question to a quiz,Question Management
+UpdateQuestion,PUT,/api/questions/{questionId},"Administrator, Content Creator",Update an existing question,Question Management
+GetQuestions,GET,/api/questions,"Administrator, Content Creator, Tutors, Student, Player",Get all questions with pagination,Question Management
+GetQuestionById,GET,/api/questions/{questionId},"Administrator, Content Creator, Tutors, Student, Player",Get question by ID,Question Management
+GetQuizQuestions,GET,/api/quizzes/{quizId}/questions,"Administrator, Content Creator, Tutors, Student, Player",Get questions for a specific quiz,Question Management
+StartAttempt,POST,/api/attempts,"Administrator, Player, Tutors",Start a new quiz attempt,Quiz Attempts
+GetAttemptById,GET,/api/attempts/{attemptId},"Administrator, Player, Tutors",Get attempt by ID,Quiz Attempts
+GetUserAttempts,GET,/api/attempts,"Administrator, Player, Tutors",Get all attempts by user with filtering,Quiz Attempts
+CompleteAttempt,POST,/api/attempts/{attemptId}/complete,"Administrator, Player, Tutors",Complete an attempt and calculate final score,Quiz Attempts
+SubmitAnswer,POST,/api/responses,"Administrator, Player, Tutors, Student",Submit an answer to a question,Response Management
+GetAttemptResponses,GET,/api/attempts/{attemptId}/responses,"Administrator, Player, Tutors, Student",Get all responses for an attempt,Response Management
+GetResponseById,GET,/api/responses/{responseId},"Administrator, Player, Tutors, Student",Get response by ID,Response Management
+GradeResponse,POST,/api/responses/{responseId}/grade,"Administrator, Tutors",Grade a response (manual grading),Response Management
+GetAllPlayers,GET,/api/players,Administrator,Get all players (Admin only),Player Management
+GetPlayerById,GET,/api/players/{id},"Administrator, Player",Get player by ID (Admin or own profile),Player Management
+CreatePlayer,POST,/api/players,Administrator,Create new player (Admin only),Player Management
+UpdatePlayer,PUT,/api/players/{id},Administrator,Update player (Admin only),Player Management
+DeletePlayer,DELETE,/api/players/{id},Administrator,Soft delete a player (Admin only),Player Management
+GetPlayerQuizzes,GET,/api/player/quizzes,"Player, Administrator",Get all quizzes for a player,Player Management
+GetContent,GET,/api/content,"Administrator, Student, Tutors, Content Creator, Player",Get translations by locale,Content Management
+GetAllContent,GET,/api/content/all,"Administrator, Student, Tutors, Content Creator, Player",Get all available locales,Content Management
+UpdateContent,PUT,/api/content/{locale},"Administrator, Student, Tutors, Content Creator, Player",Update translations for a locale,Content Management
+GetTranslation,GET,/api/content/{locale}/{key},"Administrator, Student, Tutors, Content Creator, Player",Get a specific translation,Content Management
+CreateAssignment,POST,/api/assignments,"Administrator, Tutors, Content Creator",Create quiz assignment,Assignment Management
+BulkCreateAssignments,POST,/api/assignments/bulk,"Administrator, Tutors, Content Creator",Bulk create assignments for multiple players,Assignment Management
+GetAssignments,GET,/api/assignments,"Administrator, Tutors, Content Creator",Get filtered list of assignments,Assignment Management
+GetMyAssignments,GET,/api/assignments/my,All authenticated users,Get all assignments for the authenticated user,Assignment Management
+GetAssignment,GET,/api/assignments/{assignmentId},"Administrator, Tutors, Content Creator, Assignment Owner",Get detailed information about a specific assignment,Assignment Management
+UpdateAssignment,PUT,/api/assignments/{assignmentId},"Administrator, Tutors, Content Creator",Update assignment details like due date and max attempts,Assignment Management
+StartAssignment,POST,/api/assignments/{assignmentId}/start,Assignment Owner,Mark assignment as in progress and create an attempt,Assignment Management
+CompleteAssignment,POST,/api/assignments/{assignmentId}/complete,Assignment Owner,Mark assignment as completed with score,Assignment Management
+CancelAssignment,DELETE,/api/assignments/{assignmentId},"Administrator, Tutors, Content Creator",Cancel an assignment,Assignment Management
+GetAssignmentStats,GET,/api/assignments/stats/{quizId},"Administrator, Tutors, Content Creator",Get statistics for all assignments of a specific quiz,Assignment Management
