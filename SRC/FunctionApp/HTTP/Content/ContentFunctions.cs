@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
 using Npgsql;
 
+using Quizz.Common.Services;
 using Quizz.DataAccess;
 using Quizz.Functions.Helpers;
 using System;
@@ -24,13 +25,16 @@ namespace Quizz.Functions.Endpoints.Content
     {
         private readonly IDbService _dbService;
         private readonly ILogger<ContentFunctions> _logger;
+        private readonly AuthorizationService _authService;
 
         public ContentFunctions(
             IDbService dbService,
-            ILogger<ContentFunctions> logger)
+            ILogger<ContentFunctions> logger,
+            AuthorizationService authService)
         {
             _dbService = dbService ?? throw new ArgumentNullException(nameof(dbService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _authService = authService ?? throw new ArgumentNullException(nameof(authService));
         }
 
         [Function("GetContent")]
@@ -53,6 +57,10 @@ namespace Quizz.Functions.Endpoints.Content
         public async Task<HttpResponseData> GetContent(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "content")] HttpRequestData req)
         {
+            var authResult = await _authService.ValidateAndAuthorizeAsync(req, "Administrator", "Student", "Tutors", "Content Creator", "Player");
+            if (!authResult.IsAuthorized)
+                return authResult.ErrorResponse!;
+
             var stopwatch = Stopwatch.StartNew();
 
             try
@@ -116,6 +124,10 @@ namespace Quizz.Functions.Endpoints.Content
         public async Task<HttpResponseData> GetAllContent(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "content/all")] HttpRequestData req)
         {
+            var authResult = await _authService.ValidateAndAuthorizeAsync(req, "Administrator", "Student", "Tutors", "Content Creator", "Player");
+            if (!authResult.IsAuthorized)
+                return authResult.ErrorResponse!;
+
             var stopwatch = Stopwatch.StartNew();
 
             try
@@ -165,8 +177,8 @@ namespace Quizz.Functions.Endpoints.Content
             operationId: "UpdateContent",
             tags: new[] { "Content" },
             Summary = "Update translations for a locale",
-            Description = "Updates or creates translations for a specific locale. Requires API key with 'content:write' scope.")]
-        [OpenApiSecurity("ApiKeyAuth", SecuritySchemeType.ApiKey, In = OpenApiSecurityLocationType.Header, Name = "X-API-Key")]
+            Description = "Updates or creates translations for a specific locale.")]
+        [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = "JWT")]
         [OpenApiParameter(
             name: "locale",
             In = ParameterLocation.Path,
@@ -187,6 +199,10 @@ namespace Quizz.Functions.Endpoints.Content
             [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "content/{locale}")] HttpRequestData req,
             string locale)
         {
+            var authResult = await _authService.ValidateAndAuthorizeAsync(req, "Administrator", "Student", "Tutors", "Content Creator", "Player");
+            if (!authResult.IsAuthorized)
+                return authResult.ErrorResponse!;
+
             var stopwatch = Stopwatch.StartNew();
 
             try
@@ -298,6 +314,10 @@ namespace Quizz.Functions.Endpoints.Content
             string locale,
             string key)
         {
+            var authResult = await _authService.ValidateAndAuthorizeAsync(req, "Administrator", "Student", "Tutors", "Content Creator", "Player");
+            if (!authResult.IsAuthorized)
+                return authResult.ErrorResponse!;
+
             var stopwatch = Stopwatch.StartNew();
 
             try

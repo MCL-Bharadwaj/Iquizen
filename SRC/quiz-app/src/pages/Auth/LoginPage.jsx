@@ -68,8 +68,31 @@ const LoginPage = ({ isDark, toggleTheme }) => {
       }, formData.rememberMe);
 
       if (result.success) {
-        // Redirect to role selector or dashboard
-        navigate('/');
+        // Extract roles from the user data
+        const userData = result.data;
+        const roles = userData.roles || [];
+        
+        console.log('Login successful. User roles:', roles);
+        
+        // Auto-navigate based on roles
+        // If user has only one role, go directly to that dashboard
+        // If user has multiple roles, go to role selector
+        if (roles.length === 1) {
+          const role = roles[0];
+          if (role === 'Player') {
+            navigate('/Player/dashboard');
+          } else if (role === 'Tutors' || role === 'Administrator') {
+            navigate('/creator/dashboard');
+          } else {
+            navigate('/role-selector');
+          }
+        } else if (roles.length > 1) {
+          // Multiple roles - show role selector
+          navigate('/role-selector');
+        } else {
+          // No roles found - default to role selector
+          navigate('/role-selector');
+        }
       } else {
         setApiError(result.error || 'Login failed. Please check your credentials.');
       }

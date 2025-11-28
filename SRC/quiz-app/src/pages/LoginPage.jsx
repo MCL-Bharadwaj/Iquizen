@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import authService from '../services/auth';
+import { getRolesFromToken } from '../utils/jwtHelper';
 
 function LoginPage({ isDark, toggleTheme }) {
   const navigate = useNavigate();
@@ -19,13 +20,28 @@ function LoginPage({ isDark, toggleTheme }) {
     try {
       const response = await authService.login(formData.username, formData.password);
       
-      // Redirect based on role
-      if (response.role === 'Player') {
-        navigate('/Player/dashboard');
-      } else if (response.role === 'admin') {
-        navigate('/Player/dashboard'); // Admin can access player dashboard
+      // Extract roles from token
+      const token = response.token || localStorage.getItem('authToken');
+      const roles = getRolesFromToken(token);
+      
+      console.log('Login successful. User roles:', roles);
+      
+      // Auto-navigate based on roles
+      if (roles.length === 1) {
+        const role = roles[0];
+        if (role === 'Player') {
+          navigate('/Player/dashboard');
+        } else if (role === 'Tutors' || role === 'Administrator') {
+          navigate('/creator/dashboard');
+        } else {
+          navigate('/role-selector');
+        }
+      } else if (roles.length > 1) {
+        // Multiple roles - show role selector
+        navigate('/role-selector');
       } else {
-        navigate('/');
+        // No roles - fallback to role selector
+        navigate('/role-selector');
       }
     } catch (err) {
       setError(err.message || 'Invalid username or password');

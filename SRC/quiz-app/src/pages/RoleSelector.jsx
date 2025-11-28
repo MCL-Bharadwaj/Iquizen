@@ -1,10 +1,15 @@
 import { useNavigate } from 'react-router-dom';
 import { BookOpen, UserCheck, PenTool, Moon, Sun } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { useEffect, useState } from 'react';
 
 const RoleSelector = ({ isDark, toggleTheme }) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [availableRoles, setAvailableRoles] = useState([]);
 
-  const roles = [
+  // All possible roles in the system
+  const allRoles = [
     {
       id: 'Player',
       title: 'Player',
@@ -13,6 +18,7 @@ const RoleSelector = ({ isDark, toggleTheme }) => {
       path: '/Player/dashboard',
       gradient: 'from-blue-500 to-cyan-600',
       bgGradient: isDark ? 'from-blue-950/50 to-cyan-950/50' : 'from-blue-50 to-cyan-50',
+      requiredRole: 'Player',
     },
     {
       id: 'creator',
@@ -22,8 +28,38 @@ const RoleSelector = ({ isDark, toggleTheme }) => {
       path: '/creator/dashboard',
       gradient: 'from-purple-500 to-pink-600',
       bgGradient: isDark ? 'from-purple-950/50 to-pink-950/50' : 'from-purple-50 to-pink-50',
+      requiredRole: ['Tutors', 'Administrator'], // Can be accessed by Tutors or Administrator
     },
   ];
+
+  // Filter roles based on user's roles from JWT token
+  useEffect(() => {
+    if (user && user.roles) {
+      const userRoles = user.roles; // Array of roles from decoded JWT
+      console.log('User roles from token:', userRoles);
+
+      const filtered = allRoles.filter((role) => {
+        if (Array.isArray(role.requiredRole)) {
+          // Check if user has any of the required roles
+          return role.requiredRole.some((reqRole) => userRoles.includes(reqRole));
+        } else {
+          // Check if user has the single required role
+          return userRoles.includes(role.requiredRole);
+        }
+      });
+
+      setAvailableRoles(filtered);
+      console.log('Available roles for user:', filtered.map(r => r.title));
+
+      // If user has only one role, auto-navigate to that dashboard
+      if (filtered.length === 1) {
+        console.log('Auto-navigating to:', filtered[0].path);
+        setTimeout(() => navigate(filtered[0].path), 500);
+      }
+    }
+  }, [user, navigate, isDark]);
+
+  const roles = availableRoles;
 
   return (
     <div className={`min-h-screen ${isDark ? 'bg-gray-950' : 'bg-gray-50'} flex items-center justify-center p-8`}>

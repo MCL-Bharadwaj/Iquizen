@@ -1,10 +1,12 @@
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
+using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
 using Npgsql;
 using NpgsqlTypes;
+using Quizz.Common.Services;
 using Quizz.DataAccess;
 using Quizz.DataModel.Dtos;
 using Quizz.Functions.Helpers;
@@ -26,13 +28,16 @@ namespace Quizz.Functions.Endpoints.Question
     {
         private readonly IDbService _dbService;
         private readonly ILogger<QuestionReadFunctions> _logger;
+        private readonly AuthorizationService _authService;
 
         public QuestionReadFunctions(
             IDbService dbService,
-            ILogger<QuestionReadFunctions> logger)
+            ILogger<QuestionReadFunctions> logger,
+            AuthorizationService authService)
         {
             _dbService = dbService ?? throw new ArgumentNullException(nameof(dbService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _authService = authService ?? throw new ArgumentNullException(nameof(authService));
         }
 
         [Function("GetQuestions")]
@@ -40,7 +45,8 @@ namespace Quizz.Functions.Endpoints.Question
             operationId: "GetQuestions",
             tags: new[] { "Questions - Read" },
             Summary = "Get all questions",
-            Description = "Retrieves a paginated list of questions with optional filtering. No API key required.")]
+            Description = "Retrieves a paginated list of all questions. No API key required.")]
+        [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = "JWT")]
         [OpenApiParameter(
             name: "questionType",
             In = ParameterLocation.Query,
@@ -79,6 +85,10 @@ namespace Quizz.Functions.Endpoints.Question
         public async Task<HttpResponseData> GetQuestions(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "questions")] HttpRequestData req)
         {
+            var authResult = await _authService.ValidateAndAuthorizeAsync(req, "Administrator", "Content Creator", "Tutors", "Student", "Player");
+            if (!authResult.IsAuthorized)
+                return authResult.ErrorResponse!;
+
             var stopwatch = Stopwatch.StartNew();
 
             try
@@ -180,7 +190,8 @@ namespace Quizz.Functions.Endpoints.Question
             operationId: "GetQuestionById",
             tags: new[] { "Questions - Read" },
             Summary = "Get question by ID",
-            Description = "Retrieves detailed information about a specific question. No API key required.")]
+            Description = "Retrieves detailed information about a specific question including all options. No API key required.")]
+        [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = "JWT")]
         [OpenApiParameter(
             name: "questionId",
             In = ParameterLocation.Path,
@@ -201,6 +212,10 @@ namespace Quizz.Functions.Endpoints.Question
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "questions/{questionId}")] HttpRequestData req,
             string questionId)
         {
+            var authResult = await _authService.ValidateAndAuthorizeAsync(req, "Administrator", "Content Creator", "Tutors", "Student", "Player");
+            if (!authResult.IsAuthorized)
+                return authResult.ErrorResponse!;
+
             var stopwatch = Stopwatch.StartNew();
 
             try
@@ -280,6 +295,10 @@ namespace Quizz.Functions.Endpoints.Question
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "quizzes/{quizId}/questions")] HttpRequestData req,
             string quizId)
         {
+            var authResult = await _authService.ValidateAndAuthorizeAsync(req, "Administrator", "Content Creator", "Tutors", "Student", "Player");
+            if (!authResult.IsAuthorized)
+                return authResult.ErrorResponse!;
+
             var stopwatch = Stopwatch.StartNew();
 
             try

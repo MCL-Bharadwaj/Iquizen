@@ -39,6 +39,13 @@ export const AuthProvider = ({ children }) => {
         
         // Extract user data (everything except token and refreshToken)
         const { token, refreshToken, ...userData } = response;
+        
+        // Ensure roles is properly set in user data
+        if (response.roles && !userData.roles) {
+          userData.roles = response.roles;
+        }
+        
+        console.log('AuthContext: Setting user data with roles:', userData);
         setUser(userData);
         setIsAuthenticated(true);
         

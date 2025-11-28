@@ -221,6 +221,15 @@ public static class HttpRequestDataExtensions
         await response.WriteStringAsync(json);
         return response;
     }
+
+    /// <summary>
+    /// Alias for InternalServerErrorAsync (shorter name for server errors)
+    /// Creates a 500 Internal Server Error response
+    /// </summary>
+    public static async Task<HttpResponseData> ServerErrorAsync(this HttpRequestData req, string detail = "An internal server error occurred")
+    {
+        return await req.InternalServerErrorAsync(detail);
+    }
 }
 
 

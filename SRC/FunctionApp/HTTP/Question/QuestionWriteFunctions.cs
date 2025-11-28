@@ -7,6 +7,7 @@ using Microsoft.OpenApi.Models;
 using Npgsql;
 using NpgsqlTypes;
 
+using Quizz.Common.Services;
 using Quizz.DataAccess;
 using Quizz.DataModel.Dtos;
 using Quizz.Functions.Helpers;
@@ -22,13 +23,16 @@ namespace Quizz.Functions.Endpoints.Question
     {
         private readonly IDbService _dbService;
         private readonly ILogger<QuestionWriteFunctions> _logger;
+        private readonly AuthorizationService _authService;
 
         public QuestionWriteFunctions(
             IDbService dbService,
-            ILogger<QuestionWriteFunctions> logger)
+            ILogger<QuestionWriteFunctions> logger,
+            AuthorizationService authService)
         {
             _dbService = dbService ?? throw new ArgumentNullException(nameof(dbService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _authService = authService ?? throw new ArgumentNullException(nameof(authService));
         }
 
         [Function("CreateQuestion")]
@@ -37,6 +41,7 @@ namespace Quizz.Functions.Endpoints.Question
             tags: new[] { "Questions - Write" },
             Summary = "Create a new question",
             Description = "Creates a new question.")]
+        [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = "JWT")]
         [OpenApiRequestBody(
             contentType: "application/json",
             bodyType: typeof(CreateQuestionRequest),
@@ -50,6 +55,10 @@ namespace Quizz.Functions.Endpoints.Question
         public async Task<HttpResponseData> CreateQuestion(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "questions")] HttpRequestData req)
         {
+            var authResult = await _authService.ValidateAndAuthorizeAsync(req, "Administrator", "Content Creator", "Tutors");
+            if (!authResult.IsAuthorized)
+                return authResult.ErrorResponse!;
+
             var stopwatch = Stopwatch.StartNew();
 
             try
@@ -161,8 +170,8 @@ namespace Quizz.Functions.Endpoints.Question
             operationId: "DeleteQuestion",
             tags: new[] { "Questions - Write" },
             Summary = "Delete a question",
-            Description = "Soft deletes a question. Requires API key with 'question:delete' scope.")]
-        [OpenApiSecurity("ApiKeyAuth", SecuritySchemeType.ApiKey, In = OpenApiSecurityLocationType.Header, Name = "X-API-Key")]
+            Description = "Soft deletes a question.")]
+        [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = "JWT")]
         [OpenApiParameter(
             name: "questionId",
             In = ParameterLocation.Path,
@@ -178,6 +187,10 @@ namespace Quizz.Functions.Endpoints.Question
             [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "questions/{questionId}")] HttpRequestData req,
             string questionId)
         {
+            var authResult = await _authService.ValidateAndAuthorizeAsync(req, "Administrator", "Content Creator");
+            if (!authResult.IsAuthorized)
+                return authResult.ErrorResponse!;
+
             var stopwatch = Stopwatch.StartNew();
 
             try
@@ -230,8 +243,8 @@ namespace Quizz.Functions.Endpoints.Question
             operationId: "AddQuestionToQuiz",
             tags: new[] { "Questions - Write" },
             Summary = "Add a question to a quiz",
-            Description = "Associates a question with a quiz at a specific position. Requires API key with 'question:write' scope.")]
-        [OpenApiSecurity("ApiKeyAuth", SecuritySchemeType.ApiKey, In = OpenApiSecurityLocationType.Header, Name = "X-API-Key")]
+            Description = "Associates a question with a quiz at a specific position.")]
+        [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = "JWT")]
         [OpenApiParameter(
             name: "quizId",
             In = ParameterLocation.Path,
@@ -252,6 +265,10 @@ namespace Quizz.Functions.Endpoints.Question
             [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "quizzes/{quizId}/questions")] HttpRequestData req,
             string quizId)
         {
+            var authResult = await _authService.ValidateAndAuthorizeAsync(req, "Administrator", "Content Creator");
+            if (!authResult.IsAuthorized)
+                return authResult.ErrorResponse!;
+
             var stopwatch = Stopwatch.StartNew();
 
             try
@@ -388,8 +405,8 @@ namespace Quizz.Functions.Endpoints.Question
             operationId: "UpdateQuestion",
             tags: new[] { "Questions - Write" },
             Summary = "Update an existing question",
-            Description = "Updates an existing question. Requires API key with 'question:write' scope.")]
-        [OpenApiSecurity("ApiKeyAuth", SecuritySchemeType.ApiKey, In = OpenApiSecurityLocationType.Header, Name = "X-API-Key")]
+            Description = "Updates an existing question.")]
+        [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = "JWT")]
         [OpenApiParameter(
             name: "questionId",
             In = ParameterLocation.Path,
@@ -410,6 +427,10 @@ namespace Quizz.Functions.Endpoints.Question
             [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "questions/{questionId}")] HttpRequestData req,
             string questionId)
         {
+            var authResult = await _authService.ValidateAndAuthorizeAsync(req, "Administrator", "Content Creator");
+            if (!authResult.IsAuthorized)
+                return authResult.ErrorResponse!;
+
             var stopwatch = Stopwatch.StartNew();
 
             try

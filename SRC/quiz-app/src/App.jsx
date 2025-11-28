@@ -50,6 +50,9 @@ function App() {
     <AuthProvider>
       <Router>
         <Routes>
+          {/* Root - Redirect to login if not authenticated */}
+          <Route path="/" element={<Navigate to="/login" replace />} />
+
           {/* Authentication Routes */}
           <Route path="/login" element={<LoginPage isDark={isDark} toggleTheme={toggleTheme} />} />
           <Route path="/register" element={<RegisterPage isDark={isDark} toggleTheme={toggleTheme} />} />
@@ -57,8 +60,8 @@ function App() {
           <Route path="/reset-password" element={<ResetPasswordPage isDark={isDark} toggleTheme={toggleTheme} />} />
           <Route path="/verify-email" element={<VerifyEmailPage isDark={isDark} toggleTheme={toggleTheme} />} />
 
-          {/* Landing Page - Role Selection (Protected) */}
-          <Route path="/" element={
+          {/* Role Selection Page (Protected) */}
+          <Route path="/role-selector" element={
             <ProtectedRoute>
               <RoleSelector isDark={isDark} toggleTheme={toggleTheme} />
             </ProtectedRoute>

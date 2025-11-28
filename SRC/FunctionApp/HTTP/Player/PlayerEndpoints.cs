@@ -46,8 +46,8 @@ public class PlayerEndpoints
     {
         try
         {
-            var (userId, role) = await AuthorizeRequest(req);
-            if (userId == null || role != "admin")
+            var (userId, roles) = await AuthorizeRequest(req);
+            if (userId == null || !HasAnyRole(roles, "Administrator"))
             {
                 return new UnauthorizedObjectResult(new { error = "Admin access required" });
             }
@@ -143,10 +143,10 @@ public class PlayerEndpoints
     {
         try
         {
-            var (userId, role) = await AuthorizeRequest(req);
-            if (userId == null)
+            var (userId, roles) = await AuthorizeRequest(req);
+            if (userId == null || !HasAnyRole(roles, "Administrator", "Player"))
             {
-                return new UnauthorizedObjectResult(new { error = "Authentication required" });
+                return new UnauthorizedObjectResult(new { error = "Admin or Player access required" });
             }
 
             await using var conn = await _dbService.GetConnectionAsync();
@@ -181,7 +181,7 @@ public class PlayerEndpoints
             var playerUserId = reader.GetGuid(1);
 
             // Check authorization: admin can see all, player can only see own profile
-            if (role != "admin" && userId.Value != playerUserId)
+            if (!HasAnyRole(roles, "Administrator") && userId.Value != playerUserId)
             {
                 return new UnauthorizedObjectResult(new { error = "Access denied" });
             }
@@ -226,8 +226,8 @@ public class PlayerEndpoints
     {
         try
         {
-            var (userId, role) = await AuthorizeRequest(req);
-            if (userId == null || role != "admin")
+            var (userId, roles) = await AuthorizeRequest(req);
+            if (userId == null || !HasAnyRole(roles, "Administrator"))
             {
                 return new UnauthorizedObjectResult(new { error = "Admin access required" });
             }
@@ -315,8 +315,8 @@ public class PlayerEndpoints
     {
         try
         {
-            var (userId, role) = await AuthorizeRequest(req);
-            if (userId == null || role != "admin")
+            var (userId, roles) = await AuthorizeRequest(req);
+            if (userId == null || !HasAnyRole(roles, "Administrator"))
             {
                 return new UnauthorizedObjectResult(new { error = "Admin access required" });
             }
@@ -401,8 +401,8 @@ public class PlayerEndpoints
     {
         try
         {
-            var (userId, role) = await AuthorizeRequest(req);
-            if (userId == null || role != "admin")
+            var (userId, roles) = await AuthorizeRequest(req);
+            if (userId == null || !HasAnyRole(roles, "Administrator"))
             {
                 return new UnauthorizedObjectResult(new { error = "Admin access required" });
             }
@@ -449,10 +449,10 @@ public class PlayerEndpoints
     {
         try
         {
-            var (userId, role) = await AuthorizeRequest(req);
-            if (userId == null || role != "player")
+            var (userId, roles) = await AuthorizeRequest(req);
+            if (userId == null || !HasAnyRole(roles, "Player", "Administrator"))
             {
-                return new UnauthorizedObjectResult(new { error = "Player access required" });
+                return new UnauthorizedObjectResult(new { error = "Player or Admin access required" });
             }
 
             var playerIdParam = req.Query["playerId"].FirstOrDefault();
@@ -535,19 +535,24 @@ public class PlayerEndpoints
         }
     }
 
-    private async Task<(Guid? userId, string? role)> AuthorizeRequest(HttpRequest req)
+    private async Task<(Guid? userId, List<string> roles)> AuthorizeRequest(HttpRequest req)
     {
         var authHeader = req.Headers["Authorization"].FirstOrDefault();
         if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
         {
-            return (null, null);
+            return (null, new List<string>());
         }
 
         var token = authHeader.Substring("Bearer ".Length).Trim();
         var (userId, roles) = _tokenService.ValidateTokenWithRoles(token);
-        var role = roles.FirstOrDefault();
         
-        return (userId, role);
+        return (userId, roles ?? new List<string>());
+    }
+
+    private bool HasAnyRole(List<string> userRoles, params string[] requiredRoles)
+    {
+        return requiredRoles.Any(required => 
+            userRoles.Any(userRole => userRole.Equals(required, StringComparison.OrdinalIgnoreCase)));
     }
 }
 

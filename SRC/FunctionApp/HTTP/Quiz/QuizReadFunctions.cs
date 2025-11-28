@@ -1,6 +1,7 @@
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
+using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
 using Npgsql;
@@ -8,6 +9,7 @@ using NpgsqlTypes;
 using Quizz.DataAccess;
 using Quizz.DataModel.Dtos;
 using Quizz.Functions.Helpers;
+using Quizz.Common.Services;
 using System;
 using System.Diagnostics;
 using System.Linq;
@@ -24,13 +26,16 @@ namespace Quizz.Functions.Endpoints.Quiz
     {
         private readonly IDbService _dbService;
         private readonly ILogger<QuizReadFunctions> _logger;
+        private readonly AuthorizationService _authService;
 
         public QuizReadFunctions(
             IDbService dbService,
-            ILogger<QuizReadFunctions> logger)
+            ILogger<QuizReadFunctions> logger,
+            AuthorizationService authService)
         {
             _dbService = dbService ?? throw new ArgumentNullException(nameof(dbService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _authService = authService ?? throw new ArgumentNullException(nameof(authService));
         }
 
         [Function("GetQuizzes")]
@@ -39,6 +44,7 @@ namespace Quizz.Functions.Endpoints.Quiz
             tags: new[] { "Quizzes - Read" },
             Summary = "Get all published quizzes",
             Description = "Retrieves a paginated list of published quizzes with optional filtering by difficulty and tags. No API key required.")]
+        [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = "JWT")]
         [OpenApiParameter(
             name: "difficulty",
             In = ParameterLocation.Query,
@@ -76,6 +82,11 @@ namespace Quizz.Functions.Endpoints.Quiz
         public async Task<HttpResponseData> GetQuizzes(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "quizzes")] HttpRequestData req)
         {
+            // Validate JWT token - allow admin, student, tutor, content creator, player
+            var authResult = await _authService.ValidateAndAuthorizeAsync(req, "Administrator", "Student", "Tutors", "Content Creator", "Player");
+            if (!authResult.IsAuthorized)
+                return authResult.ErrorResponse!;
+
             var stopwatch = Stopwatch.StartNew();
 
             try
@@ -167,7 +178,8 @@ namespace Quizz.Functions.Endpoints.Quiz
             operationId: "GetQuizById",
             tags: new[] { "Quizzes - Read" },
             Summary = "Get quiz by ID",
-            Description = "Retrieves detailed information about a specific quiz by its ID. No API key required.")]
+            Description = "Retrieves detailed information about a specific quiz including metadata and all questions. No API key required.")]
+        [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = "JWT")]
         [OpenApiParameter(
             name: "quizId",
             In = ParameterLocation.Path,
@@ -193,6 +205,11 @@ namespace Quizz.Functions.Endpoints.Quiz
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "quizzes/{quizId}")] HttpRequestData req,
             string quizId)
         {
+            // Validate JWT token - allow admin, student, tutor, content creator, player
+            var authResult = await _authService.ValidateAndAuthorizeAsync(req, "Administrator", "Student", "Tutors", "Content Creator", "Player");
+            if (!authResult.IsAuthorized)
+                return authResult.ErrorResponse!;
+
             var stopwatch = Stopwatch.StartNew();
 
             try

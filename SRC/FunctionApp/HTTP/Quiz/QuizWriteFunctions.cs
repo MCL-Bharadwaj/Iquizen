@@ -7,6 +7,7 @@ using Microsoft.OpenApi.Models;
 using Npgsql;
 using NpgsqlTypes;
 
+using Quizz.Common.Services;
 using Quizz.DataAccess;
 using Quizz.DataModel.Dtos;
 using Quizz.Functions.Helpers;
@@ -26,13 +27,16 @@ namespace Quizz.Functions.Endpoints.Quiz
     {
         private readonly IDbService _dbService;
         private readonly ILogger<QuizWriteFunctions> _logger;
+        private readonly AuthorizationService _authService;
 
         public QuizWriteFunctions(
             IDbService dbService,
-            ILogger<QuizWriteFunctions> logger)
+            ILogger<QuizWriteFunctions> logger,
+            AuthorizationService authService)
         {
             _dbService = dbService ?? throw new ArgumentNullException(nameof(dbService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _authService = authService ?? throw new ArgumentNullException(nameof(authService));
         }
 
         [Function("CreateQuiz")]
@@ -41,6 +45,7 @@ namespace Quizz.Functions.Endpoints.Quiz
             tags: new[] { "Quizzes - Write" },
             Summary = "Create a new quiz",
             Description = "Creates a new quiz.")]
+        [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = "JWT")]
         [OpenApiRequestBody(
             contentType: "application/json",
             bodyType: typeof(CreateQuizRequest),
@@ -69,6 +74,10 @@ namespace Quizz.Functions.Endpoints.Quiz
         public async Task<HttpResponseData> CreateQuiz(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "quizzes")] HttpRequestData req)
         {
+            var authResult = await _authService.ValidateAndAuthorizeAsync(req, "Tutors", "Content Creator", "Administrator");
+            if (!authResult.IsAuthorized)
+                return authResult.ErrorResponse!;
+
             var stopwatch = Stopwatch.StartNew();
 
             try
@@ -188,8 +197,8 @@ namespace Quizz.Functions.Endpoints.Quiz
             operationId: "UpdateQuiz",
             tags: new[] { "Quizzes - Write" },
             Summary = "Update an existing quiz",
-            Description = "Updates an existing quiz. Requires API key with 'quiz:write' scope.")]
-        [OpenApiSecurity("ApiKeyAuth", SecuritySchemeType.ApiKey, In = OpenApiSecurityLocationType.Header, Name = "X-API-Key")]
+            Description = "Updates an existing quiz.")]
+        [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = "JWT")]
         [OpenApiParameter(
             name: "quizId",
             In = ParameterLocation.Path,
@@ -225,6 +234,10 @@ namespace Quizz.Functions.Endpoints.Quiz
             [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "quizzes/{quizId}")] HttpRequestData req,
             string quizId)
         {
+            var authResult = await _authService.ValidateAndAuthorizeAsync(req, "Administrator", "Content Creator");
+            if (!authResult.IsAuthorized)
+                return authResult.ErrorResponse!;
+
             var stopwatch = Stopwatch.StartNew();
 
             try
@@ -356,8 +369,8 @@ namespace Quizz.Functions.Endpoints.Quiz
             operationId: "DeleteQuiz",
             tags: new[] { "Quizzes - Write" },
             Summary = "Delete a quiz",
-            Description = "Soft deletes a quiz (sets deleted_at timestamp). Requires API key with 'quiz:delete' scope.")]
-        [OpenApiSecurity("ApiKeyAuth", SecuritySchemeType.ApiKey, In = OpenApiSecurityLocationType.Header, Name = "X-API-Key")]
+            Description = "Soft deletes a quiz (sets deleted_at timestamp).")]
+        [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = "JWT")]
         [OpenApiParameter(
             name: "quizId",
             In = ParameterLocation.Path,
@@ -383,6 +396,10 @@ namespace Quizz.Functions.Endpoints.Quiz
             [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "quizzes/{quizId}")] HttpRequestData req,
             string quizId)
         {
+            var authResult = await _authService.ValidateAndAuthorizeAsync(req, "Administrator", "Content Creator");
+            if (!authResult.IsAuthorized)
+                return authResult.ErrorResponse!;
+
             var stopwatch = Stopwatch.StartNew();
 
             try

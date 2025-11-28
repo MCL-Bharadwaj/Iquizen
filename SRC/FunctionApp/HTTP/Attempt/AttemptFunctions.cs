@@ -8,6 +8,7 @@ using Npgsql;
 using Quizz.DataAccess;
 using Quizz.DataModel.Dtos;
 using Quizz.Functions.Helpers;
+using Quizz.Common.Services;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -21,13 +22,16 @@ namespace Quizz.Functions.Endpoints.Attempt
     {
         private readonly IDbService _dbService;
         private readonly ILogger<AttemptFunctions> _logger;
+        private readonly AuthorizationService _authService;
 
         public AttemptFunctions(
             IDbService dbService,
-            ILogger<AttemptFunctions> logger)
+            ILogger<AttemptFunctions> logger,
+            AuthorizationService authService)
         {
             _dbService = dbService ?? throw new ArgumentNullException(nameof(dbService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _authService = authService ?? throw new ArgumentNullException(nameof(authService));
         }
 
         [Function("StartAttempt")]
@@ -36,6 +40,7 @@ namespace Quizz.Functions.Endpoints.Attempt
             tags: new[] { "Attempts" },
             Summary = "Start a new quiz attempt",
             Description = "Creates a new attempt for a quiz.")]
+        [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = "JWT")]
         [OpenApiRequestBody(
             contentType: "application/json",
             bodyType: typeof(StartAttemptRequest),
@@ -48,6 +53,10 @@ namespace Quizz.Functions.Endpoints.Attempt
         public async Task<HttpResponseData> StartAttempt(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "attempts")] HttpRequestData req)
         {
+            var authResult = await _authService.ValidateAndAuthorizeAsync(req, "Administrator", "Player", "Tutors");
+            if (!authResult.IsAuthorized)
+                return authResult.ErrorResponse!;
+
             var stopwatch = Stopwatch.StartNew();
 
             try
@@ -122,6 +131,7 @@ namespace Quizz.Functions.Endpoints.Attempt
             tags: new[] { "Attempts" },
             Summary = "Get attempt by ID",
             Description = "Retrieves attempt details.")]
+        [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = "JWT")]
         [OpenApiParameter(
             name: "attemptId",
             In = ParameterLocation.Path,
@@ -136,6 +146,10 @@ namespace Quizz.Functions.Endpoints.Attempt
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "attempts/{attemptId}")] HttpRequestData req,
             string attemptId)
         {
+            var authResult = await _authService.ValidateAndAuthorizeAsync(req, "Administrator", "Player", "Tutors");
+            if (!authResult.IsAuthorized)
+                return authResult.ErrorResponse!;
+
             var stopwatch = Stopwatch.StartNew();
 
             try
@@ -207,6 +221,7 @@ namespace Quizz.Functions.Endpoints.Attempt
             tags: new[] { "Attempts" },
             Summary = "Get all attempts by user",
             Description = "Retrieves all attempts for a specific user.")]
+        [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = "JWT")]
         [OpenApiParameter(
             name: "userId",
             In = ParameterLocation.Query,
@@ -220,6 +235,10 @@ namespace Quizz.Functions.Endpoints.Attempt
         public async Task<HttpResponseData> GetUserAttempts(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "attempts")] HttpRequestData req)
         {
+            var authResult = await _authService.ValidateAndAuthorizeAsync(req, "Administrator", "Player", "Tutors");
+            if (!authResult.IsAuthorized)
+                return authResult.ErrorResponse!;
+
             var stopwatch = Stopwatch.StartNew();
 
             try
@@ -295,7 +314,8 @@ namespace Quizz.Functions.Endpoints.Attempt
             operationId: "CompleteAttempt",
             tags: new[] { "Attempts" },
             Summary = "Complete an attempt",
-            Description = "Marks an attempt as completed and calculates the final score.")]
+            Description = "Marks a quiz attempt as completed and calculates the final score.")]
+        [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = "JWT")]
         [OpenApiParameter(
             name: "attemptId",
             In = ParameterLocation.Path,
@@ -310,6 +330,10 @@ namespace Quizz.Functions.Endpoints.Attempt
             [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "attempts/{attemptId}/complete")] HttpRequestData req,
             string attemptId)
         {
+            var authResult = await _authService.ValidateAndAuthorizeAsync(req, "Administrator", "Player", "Tutors");
+            if (!authResult.IsAuthorized)
+                return authResult.ErrorResponse!;
+
             var stopwatch = Stopwatch.StartNew();
 
             try

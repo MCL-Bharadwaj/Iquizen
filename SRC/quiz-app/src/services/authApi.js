@@ -3,6 +3,28 @@ import axios from 'axios';
 // External LMS API - Use environment variable or fallback to dev server
 const BASE_URL = import.meta.env.VITE_AUTH_API_URL || 'http://localhost:7072/api';
 
+/**
+ * Decode JWT token to extract payload
+ * @param {string} token - JWT token
+ * @returns {Object|null} Decoded payload or null if invalid
+ */
+const decodeJWT = (token) => {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (error) {
+    console.error('Error decoding JWT:', error);
+    return null;
+  }
+};
+
 const authClient = axios.create({
   baseURL: BASE_URL,
   headers: {
@@ -142,16 +164,47 @@ export const authApi = {
       
       // Store token, refresh token, and user data
       if (response.data?.token) {
-        localStorage.setItem('authToken', response.data.token);
+        const token = response.data.token;
+        localStorage.setItem('authToken', token);
+        
+        // Decode JWT to extract payload
+        const decodedToken = decodeJWT(token);
+        
+        if (decodedToken) {
+          // Extract userId and roles from token claims
+          const userId = decodedToken.userId || decodedToken.sub;
+          const email = decodedToken.email;
+          const roles = decodedToken.role || []; // 'role' claim contains array of roles
+          
+          // Build user data object with decoded information
+          const userData = {
+            userId: userId,
+            email: email,
+            roles: Array.isArray(roles) ? roles : [roles], // Ensure roles is an array
+            firstName: response.data.firstName || null,
+            lastName: response.data.lastName || null,
+            ...response.data // Include any other data from response
+          };
+          
+          // Remove token from userData to avoid duplication
+          delete userData.token;
+          delete userData.refreshToken;
+          
+          localStorage.setItem('user', JSON.stringify(userData));
+          
+          // Return enriched response with decoded data
+          return {
+            ...response.data,
+            userId: userId,
+            email: email,
+            roles: userData.roles
+          };
+        }
         
         // Store refresh token if provided
         if (response.data?.refreshToken) {
           localStorage.setItem('refreshToken', response.data.refreshToken);
         }
-        
-        // Extract user data from response (userId, email, firstName, lastName, roles)
-        const { token, refreshToken, ...userData } = response.data;
-        localStorage.setItem('user', JSON.stringify(userData));
       }
       
       return response.data;
