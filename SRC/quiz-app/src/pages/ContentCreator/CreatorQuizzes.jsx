@@ -14,7 +14,8 @@ import {
   LayoutGrid,
   Users,
   Tag,
-  Filter
+  Filter,
+  Plus
 } from 'lucide-react';
 
 const CreatorQuizzes = ({ isDark }) => {
@@ -493,6 +494,13 @@ const CreatorQuizzes = ({ isDark }) => {
               Manage all your quizzes
             </p>
           </div>
+          <button
+            onClick={() => navigate('/creator/quiz/create')}
+            className="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition-all shadow-lg hover:shadow-xl"
+          >
+            <Plus className="w-5 h-5" />
+            Create New Quiz
+          </button>
         </div>
       </div>
 

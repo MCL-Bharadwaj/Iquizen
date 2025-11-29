@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Filter, BookOpen, Clock, Loader2, AlertCircle, Play } from 'lucide-react';
-import { quizApi } from '../../services/api';
+import { Search, Filter, BookOpen, Clock, Loader2, AlertCircle, Play, Lock } from 'lucide-react';
+import { quizApi, assignmentApi, attemptApi, helpers } from '../../services/api';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const PlayerQuizzes = ({ isDark }) => {
   const navigate = useNavigate();
@@ -10,6 +12,8 @@ const PlayerQuizzes = ({ isDark }) => {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDifficulty, setFilterDifficulty] = useState('');
+  const [userAttempts, setUserAttempts] = useState([]);
+  const userId = helpers.getUserId('Player');
 
   useEffect(() => {
     fetchQuizzes();
@@ -19,12 +23,36 @@ const PlayerQuizzes = ({ isDark }) => {
     try {
       setLoading(true);
       setError(null);
-      const data = await quizApi.getQuizzes({ limit: 100 });
-      console.log('Fetched quizzes:', data); // Debug log
-      setQuizzes(data.data || []); // Backend returns 'data' array
+      
+      // Fetch assigned quizzes from assignments API
+      const assignmentsData = await assignmentApi.getMyAssignments();
+      console.log('Fetched assignments:', assignmentsData); // Debug log
+      
+      // Fetch user attempts to check max_attempts
+      const attemptsData = await attemptApi.getUserAttempts(userId);
+      setUserAttempts(attemptsData || []);
+      
+      // Transform assignments to quiz format for display
+      const assignedQuizzes = assignmentsData.map(assignment => ({
+        quizId: assignment.quizId,
+        title: assignment.quizTitle,
+        description: assignment.quizDescription,
+        subject: assignment.subject,
+        difficulty: assignment.difficulty,
+        estimatedMinutes: assignment.estimatedMinutes,
+        assignmentId: assignment.assignmentId,
+        assignedAt: assignment.assignedAt,
+        dueDate: assignment.dueDate,
+        status: assignment.status,
+        isMandatory: assignment.isMandatory,
+        maxAttempts: assignment.maxAttempts,
+        attemptsUsed: assignment.attemptsUsed,
+      }));
+      
+      setQuizzes(assignedQuizzes);
     } catch (err) {
-      console.error('Failed to fetch quizzes:', err);
-      setError('Failed to load quizzes. Please make sure the API is running.');
+      console.error('Failed to fetch assigned quizzes:', err);
+      setError('Failed to load assigned quizzes. Please make sure the API is running.');
     } finally {
       setLoading(false);
     }
@@ -102,11 +130,29 @@ const PlayerQuizzes = ({ isDark }) => {
 
       {/* Quizzes Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredQuizzes.map((quiz) => (
+        {filteredQuizzes.map((quiz) => {
+          const isMaxAttemptsReached = quiz.maxAttempts && quiz.attemptsUsed >= quiz.maxAttempts;
+          const handleQuizClick = () => {
+            if (isMaxAttemptsReached) {
+              toast.error(`Maximum attempts (${quiz.maxAttempts}) reached for this quiz`, {
+                position: 'top-center',
+                autoClose: 3000,
+                theme: isDark ? 'dark' : 'light',
+              });
+              return;
+            }
+            navigate(`/Player/quiz/${quiz.quizId}`);
+          };
+          
+          return (
           <div
             key={quiz.quizId}
-            className={`rounded-2xl ${isDark ? 'bg-gray-800' : 'bg-white'} shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer overflow-hidden`}
-            onClick={() => navigate(`/Player/quiz/${quiz.quizId}`)}
+            className={`rounded-2xl ${isDark ? 'bg-gray-800' : 'bg-white'} shadow-lg transition-all duration-300 overflow-hidden ${
+              isMaxAttemptsReached 
+                ? 'opacity-60 cursor-not-allowed' 
+                : 'hover:shadow-xl hover:-translate-y-1 cursor-pointer'
+            }`}
+            onClick={handleQuizClick}
           >
             {/* Header with gradient */}
             <div className="h-32 bg-gradient-to-br from-blue-500 to-cyan-600 p-6 flex items-end">
@@ -138,16 +184,52 @@ const PlayerQuizzes = ({ isDark }) => {
                 }`}>
                   {quiz.difficulty || 'medium'}
                 </span>
+                {quiz.isMandatory && (
+                  <span className="text-xs px-2 py-1 rounded bg-orange-500/20 text-orange-400">
+                    Mandatory
+                  </span>
+                )}
               </div>
 
-              <button className="w-full py-3 bg-gradient-to-r from-blue-500 to-cyan-600 text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center justify-center gap-2">
-                <Play className="w-5 h-5" />
-                Start Quiz
+              {/* Assignment-specific info */}
+              {quiz.dueDate && (
+                <div className={`text-xs mb-3 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                  Due: {new Date(quiz.dueDate).toLocaleDateString()}
+                </div>
+              )}
+
+              {quiz.maxAttempts && (
+                <div className={`text-xs mb-3 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                  Attempts: {quiz.attemptsUsed || 0} / {quiz.maxAttempts}
+                </div>
+              )}
+
+              <button 
+                className={`w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2 ${
+                  isMaxAttemptsReached
+                    ? 'bg-gray-500 text-gray-300 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-blue-500 to-cyan-600 text-white hover:shadow-lg'
+                }`}
+                disabled={isMaxAttemptsReached}
+              >
+                {isMaxAttemptsReached ? (
+                  <>
+                    <Lock className="w-5 h-5" />
+                    Max Attempts Reached
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-5 h-5" />
+                    Start Quiz
+                  </>
+                )}
               </button>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
+      <ToastContainer />
     </div>
   );
 };

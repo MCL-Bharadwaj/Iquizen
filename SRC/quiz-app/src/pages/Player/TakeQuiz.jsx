@@ -109,7 +109,15 @@ const TakeQuiz = ({ isDark }) => {
       console.log('[ensureAttemptCreated] ✓ Created new attempt:', attempt.attemptId);
       return attempt.attemptId;
     } catch (error) {
-      console.error('[ensureAttemptCreated] ✗ Error creating attempt:', error);
+      // Check if this is a max attempts error (silently fail)
+      const isMaxAttemptsError = error?.response?.status === 400 && 
+        error?.response?.data?.message?.includes('Maximum attempts');
+      
+      if (!isMaxAttemptsError) {
+        console.error('[ensureAttemptCreated] ✗ Error creating attempt:', error);
+      }
+      // This error is now prevented at the quiz list level
+      // Silently fail for max attempts errors
       throw error;
     } finally {
       attemptCreationInProgress.current = false;
@@ -153,7 +161,11 @@ const TakeQuiz = ({ isDark }) => {
         console.log('[submitAnswer] ✓ Answer submitted successfully');
       }
     } catch (error) {
-      console.error('[submitAnswer] ✗ Error submitting answer:', error);
+      // Silently fail for max attempts errors
+      const isMaxAttemptsError = error?.response?.status === 400;
+      if (!isMaxAttemptsError) {
+        console.error('[submitAnswer] ✗ Error submitting answer:', error);
+      }
     }
   };
 
@@ -211,8 +223,12 @@ const TakeQuiz = ({ isDark }) => {
       setResult(completedAttempt);
       setSubmitted(true);
     } catch (error) {
-      console.error('[handleSubmitQuiz] ✗ Error submitting quiz:', error);
-      alert('Failed to submit quiz. Please try again.');
+      // Silently fail for max attempts errors
+      const isMaxAttemptsError = error?.response?.status === 400;
+      if (!isMaxAttemptsError) {
+        console.error('[handleSubmitQuiz] ✗ Error submitting quiz:', error);
+        alert('Failed to submit quiz. Please try again.');
+      }
     } finally {
       setSubmitting(false);
     }

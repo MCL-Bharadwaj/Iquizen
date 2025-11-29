@@ -1,5 +1,6 @@
 import { createContext, useState, useEffect, useContext } from 'react';
 import authApi from '../services/authApi';
+import { getRolesFromToken } from '../utils/jwtHelper';
 
 export const AuthContext = createContext();
 
@@ -16,8 +17,13 @@ export const AuthProvider = ({ children }) => {
       const storedUser = authApi.getCurrentUser();
 
       if (storedToken && storedUser) {
+        // Always decode roles from token to ensure they're up-to-date
+        const rolesFromToken = getRolesFromToken(storedToken);
+        const userWithRoles = { ...storedUser, roles: rolesFromToken };
+        
+        console.log('AuthContext: Initializing with roles from token:', rolesFromToken);
         setToken(storedToken);
-        setUser(storedUser);
+        setUser(userWithRoles);
         setIsAuthenticated(true);
       }
       setLoading(false);
@@ -40,12 +46,11 @@ export const AuthProvider = ({ children }) => {
         // Extract user data (everything except token and refreshToken)
         const { token, refreshToken, ...userData } = response;
         
-        // Ensure roles is properly set in user data
-        if (response.roles && !userData.roles) {
-          userData.roles = response.roles;
-        }
+        // ALWAYS decode roles from JWT token for accuracy
+        const rolesFromToken = getRolesFromToken(response.token);
+        userData.roles = rolesFromToken;
         
-        console.log('AuthContext: Setting user data with roles:', userData);
+        console.log('AuthContext: Setting user data with roles from token:', userData);
         setUser(userData);
         setIsAuthenticated(true);
         

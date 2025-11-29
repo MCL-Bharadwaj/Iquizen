@@ -392,6 +392,56 @@ export const responseApi = {
   },
 };
 
+// ==================== ASSIGNMENT API ====================
+export const assignmentApi = {
+  // Get all assignments for the current user
+  getMyAssignments: async (status = null) => {
+    try {
+      const params = status ? { status } : {};
+      const response = await apiClient.get('/my-assignments', { params });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching user assignments:', error);
+      throw error;
+    }
+  },
+
+  // Get specific assignment by ID
+  getAssignmentById: async (assignmentId) => {
+    try {
+      const response = await apiClient.get(`/assignments/${assignmentId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching assignment:', error);
+      throw error;
+    }
+  },
+
+  // Start an assignment
+  startAssignment: async (assignmentId) => {
+    try {
+      const response = await apiClient.post(`/assignments/${assignmentId}/start`);
+      return response.data;
+    } catch (error) {
+      console.error('Error starting assignment:', error);
+      throw error;
+    }
+  },
+
+  // Complete an assignment with score
+  completeAssignment: async (assignmentId, score) => {
+    try {
+      const response = await apiClient.post(`/assignments/${assignmentId}/complete`, {
+        score,
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error completing assignment:', error);
+      throw error;
+    }
+  },
+};
+
 // ==================== HELPER FUNCTIONS ====================
 export const helpers = {
   // Generate a simple user ID (for demo purposes)
@@ -401,17 +451,31 @@ export const helpers = {
     return `${role}_${timestamp}_${random}`;
   },
 
-  // Get or create user ID from localStorage
+  // Get user ID from JWT token
   getUserId: (role) => {
-    const storageKey = `userId_${role}`;
-    let userId = localStorage.getItem(storageKey);
+    // Get token from localStorage
+    const token = localStorage.getItem('authToken');
     
-    if (!userId) {
-      userId = helpers.generateUserId(role);
-      localStorage.setItem(storageKey, userId);
+    if (!token) {
+      console.error('No authentication token found');
+      return null;
     }
     
-    return userId;
+    try {
+      // Decode JWT token to extract user ID
+      const decoded = JSON.parse(atob(token.split('.')[1]));
+      const userId = decoded.userId || decoded.sub || decoded.user_id;
+      
+      if (!userId) {
+        console.error('No user ID found in token');
+        return null;
+      }
+      
+      return userId;
+    } catch (error) {
+      console.error('Error decoding token:', error);
+      return null;
+    }
   },
 
   // Calculate stats from attempts

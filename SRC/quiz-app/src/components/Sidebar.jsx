@@ -33,9 +33,8 @@ const Sidebar = ({ isDark, toggleTheme, role = 'Player' }) => {
     ],
     creator: [
       { icon: Home, label: 'Dashboard', path: '/creator/dashboard' },
-      { icon: BookOpen, label: 'All Quizzes', path: '/creator/quizzes' },
+      { icon: BookOpen, label: 'Quizzes', path: '/creator/quizzes' },
       { icon: HelpCircle, label: 'Questions', path: '/creator/questions' },
-      { icon: PenTool, label: 'Create Quiz', path: '/creator/quiz/create' },
     ],
   };
 
@@ -134,16 +133,18 @@ const Sidebar = ({ isDark, toggleTheme, role = 'Player' }) => {
 
       {/* Bottom Actions */}
       <div className={`p-2 space-y-1 border-t ${isDark ? 'border-gray-800' : 'border-gray-200'}`}>
-        <button
-          onClick={handleSwitchRole}
-          className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors ${
-            isDark ? 'hover:bg-gray-800 text-gray-400 hover:text-white' : 'hover:bg-gray-100 text-gray-600 hover:text-gray-900'
-          } ${isCollapsed ? 'justify-center' : ''}`}
-          title={isCollapsed ? 'Switch Role' : ''}
-        >
-          <RefreshCw className="w-5 h-5 flex-shrink-0" />
-          {!isCollapsed && <span className="text-sm font-medium">Switch Role</span>}
-        </button>
+        {authService.hasMultipleRoles() && (
+          <button
+            onClick={handleSwitchRole}
+            className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors ${
+              isDark ? 'hover:bg-gray-800 text-gray-400 hover:text-white' : 'hover:bg-gray-100 text-gray-600 hover:text-gray-900'
+            } ${isCollapsed ? 'justify-center' : ''}`}
+            title={isCollapsed ? 'Switch Role' : ''}
+          >
+            <RefreshCw className="w-5 h-5 flex-shrink-0" />
+            {!isCollapsed && <span className="text-sm font-medium">Switch Role</span>}
+          </button>
+        )}
 
         <button
           onClick={handleLogout}

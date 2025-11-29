@@ -26,18 +26,20 @@ function LoginPage({ isDark, toggleTheme }) {
       
       console.log('Login successful. User roles:', roles);
       
-      // Auto-navigate based on roles
+      // Navigate based on number of roles
       if (roles.length === 1) {
+        // Single role - auto-navigate to appropriate dashboard
         const role = roles[0];
         if (role === 'Player') {
           navigate('/Player/dashboard');
-        } else if (role === 'Tutors' || role === 'Administrator') {
+        } else if (role === 'Content Creator' ) {
           navigate('/creator/dashboard');
         } else {
+          // Tutors or other unknown roles - go to role selector
           navigate('/role-selector');
         }
       } else if (roles.length > 1) {
-        // Multiple roles - show role selector
+        // Multiple roles - show role selector for user to choose
         navigate('/role-selector');
       } else {
         // No roles - fallback to role selector

@@ -126,6 +126,35 @@ class AuthService {
       'Authorization': token ? `Bearer ${token}` : '',
     };
   }
+
+  // Get all roles from JWT token
+  getUserRoles() {
+    try {
+      const token = this.getToken();
+      if (!token) return [];
+
+      // Decode JWT token
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      
+      // Extract roles - they can be a single value or an array
+      const roles = payload.role;
+      if (Array.isArray(roles)) {
+        return roles;
+      } else if (roles) {
+        return [roles];
+      }
+      return [];
+    } catch (error) {
+      console.error('Error extracting roles from token:', error);
+      return [];
+    }
+  }
+
+  // Check if user has multiple roles
+  hasMultipleRoles() {
+    const roles = this.getUserRoles();
+    return roles.length > 1;
+  }
 }
 
 export default new AuthService();

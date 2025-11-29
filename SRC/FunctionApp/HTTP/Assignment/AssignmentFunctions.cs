@@ -10,6 +10,7 @@ using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
 using Microsoft.OpenApi.Models;
 using System.Net;
+using Npgsql;
 
 namespace Quizz.HTTP.Assignment;
 
@@ -80,7 +81,7 @@ public class AssignmentFunctions
                     max_attempts, is_mandatory, notes, metadata
                 )
                 VALUES (
-                    @QuizId, @UserId, @AssignedBy, @DueDate,
+                    @QuizId, @UserId::uuid, @AssignedBy, @DueDate,
                     @MaxAttempts, @IsMandatory, @Notes, @Metadata::jsonb
                 )
                 RETURNING 
@@ -103,35 +104,83 @@ public class AssignmentFunctions
                     : null
             };
 
-            var result = await _dbService.QuerySingleAsync<dynamic>(sql, parameters);
-
-            if (result == null)
+            var npgsqlParams = new[]
+            {
+                new NpgsqlParameter("@QuizId", assignment.QuizId),
+                new NpgsqlParameter("@UserId", assignment.UserId),
+                new NpgsqlParameter("@AssignedBy", authResult.UserId.ToString()),
+                new NpgsqlParameter("@DueDate", (object?)assignment.DueDate ?? DBNull.Value),
+                new NpgsqlParameter("@MaxAttempts", (object?)assignment.MaxAttempts ?? DBNull.Value),
+                new NpgsqlParameter("@IsMandatory", assignment.IsMandatory),
+                new NpgsqlParameter("@Notes", (object?)assignment.Notes ?? DBNull.Value),
+                new NpgsqlParameter("@Metadata", assignment.Metadata != null ? JsonSerializer.Serialize(assignment.Metadata) : DBNull.Value)
+            };
+            
+            var reader = await _dbService.ExecuteQueryAsync(sql, npgsqlParams);
+            
+            if (!await reader.ReadAsync())
+            {
+                await reader.DisposeAsync();
                 return await req.ServerErrorAsync("Failed to create assignment");
+            }
+
+            var assignmentId = reader.GetGuid(reader.GetOrdinal("assignment_id"));
+            var quizId = reader.GetGuid(reader.GetOrdinal("quiz_id"));
+            var userId = reader.GetGuid(reader.GetOrdinal("user_id")).ToString();
+            var assignedBy = reader.IsDBNull(reader.GetOrdinal("assigned_by")) ? null : reader.GetString(reader.GetOrdinal("assigned_by"));
+            var assignedAt = reader.GetDateTime(reader.GetOrdinal("assigned_at"));
+            var dueDate = reader.IsDBNull(reader.GetOrdinal("due_date")) ? (DateTime?)null : reader.GetDateTime(reader.GetOrdinal("due_date"));
+            var status = reader.GetString(reader.GetOrdinal("status"));
+            var maxAttempts = reader.IsDBNull(reader.GetOrdinal("max_attempts")) ? (int?)null : reader.GetInt32(reader.GetOrdinal("max_attempts"));
+            var attemptsUsed = reader.GetInt32(reader.GetOrdinal("attempts_used"));
+            var isMandatory = reader.GetBoolean(reader.GetOrdinal("is_mandatory"));
+            var notes = reader.IsDBNull(reader.GetOrdinal("notes")) ? null : reader.GetString(reader.GetOrdinal("notes"));
+            var createdAt = reader.GetDateTime(reader.GetOrdinal("created_at"));
+            var updatedAt = reader.GetDateTime(reader.GetOrdinal("updated_at"));
+            
+            await reader.DisposeAsync();
 
             // Get quiz details
             var quizSql = "SELECT title, description, subject, difficulty, estimated_minutes FROM quiz.quizzes WHERE quiz_id = @QuizId";
-            var quizDetails = await _dbService.QuerySingleAsync<dynamic>(quizSql, new { assignment.QuizId });
+            var quizParams = new[] { new NpgsqlParameter("@QuizId", assignment.QuizId) };
+            var quizReader = await _dbService.ExecuteQueryAsync(quizSql, quizParams);
+            
+            string quizTitle = "";
+            string? quizDescription = null;
+            string? subject = null;
+            string? difficulty = null;
+            int? estimatedMinutes = null;
+            
+            if (await quizReader.ReadAsync())
+            {
+                quizTitle = quizReader.GetString(0);
+                quizDescription = quizReader.IsDBNull(1) ? null : quizReader.GetString(1);
+                subject = quizReader.IsDBNull(2) ? null : quizReader.GetString(2);
+                difficulty = quizReader.IsDBNull(3) ? null : quizReader.GetString(3);
+                estimatedMinutes = quizReader.IsDBNull(4) ? (int?)null : quizReader.GetInt32(4);
+            }
+            await quizReader.DisposeAsync();
 
             var response = new AssignmentResponse
             {
-                AssignmentId = result.assignment_id,
-                QuizId = result.quiz_id,
-                QuizTitle = quizDetails?.title ?? "",
-                QuizDescription = quizDetails?.description,
-                Subject = quizDetails?.subject,
-                Difficulty = quizDetails?.difficulty,
-                EstimatedMinutes = quizDetails?.estimated_minutes,
-                UserId = result.user_id,
-                AssignedBy = result.assigned_by,
-                AssignedAt = result.assigned_at,
-                DueDate = result.due_date,
-                Status = result.status,
-                MaxAttempts = result.max_attempts,
-                AttemptsUsed = result.attempts_used,
-                IsMandatory = result.is_mandatory,
-                Notes = result.notes,
-                CreatedAt = result.created_at,
-                UpdatedAt = result.updated_at
+                AssignmentId = assignmentId,
+                QuizId = quizId,
+                QuizTitle = quizTitle,
+                QuizDescription = quizDescription,
+                Subject = subject,
+                Difficulty = difficulty,
+                EstimatedMinutes = estimatedMinutes,
+                UserId = userId,
+                AssignedBy = assignedBy,
+                AssignedAt = assignedAt,
+                DueDate = dueDate,
+                Status = status,
+                MaxAttempts = maxAttempts,
+                AttemptsUsed = attemptsUsed,
+                IsMandatory = isMandatory,
+                Notes = notes,
+                CreatedAt = createdAt,
+                UpdatedAt = updatedAt
             };
 
             _logger.LogInformation("Assignment created successfully: {AssignmentId}", response.AssignmentId);
@@ -371,7 +420,7 @@ public class AssignmentFunctions
 
     /// <summary>
     /// Get assignments for current user (player view)
-    /// GET /api/assignments/my
+    /// GET /api/my-assignments
     /// Requires: Any authenticated user
     /// </summary>
     [Function("GetMyAssignments")]
@@ -380,7 +429,7 @@ public class AssignmentFunctions
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json", bodyType: typeof(List<AssignmentResponse>), Description = "User's assignments")]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.Unauthorized, contentType: "application/json", bodyType: typeof(object), Description = "Authentication required")]
     public async Task<HttpResponseData> GetMyAssignments(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "assignments/my")]
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "my-assignments")]
         HttpRequestData req)
     {
         _logger.LogInformation("Getting user's assignments");
@@ -397,40 +446,64 @@ public class AssignmentFunctions
             var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
             var status = query["status"];
 
-            var sql = "SELECT * FROM quiz.v_user_assignments WHERE user_id = @UserId";
+            // Query assignments with quiz details using JOIN
+            var sql = @"
+                SELECT 
+                    qa.assignment_id, qa.quiz_id, qa.user_id, qa.assigned_by,
+                    qa.assigned_at, qa.due_date, qa.status, qa.started_at, qa.completed_at,
+                    qa.score, qa.max_attempts, qa.attempts_used, qa.is_mandatory, qa.notes,
+                    qa.created_at, qa.updated_at,
+                    q.title as quiz_title, q.description as quiz_description,
+                    q.subject, q.difficulty, q.estimated_minutes
+                FROM quiz.quiz_assignments qa
+                LEFT JOIN quiz.quizzes q ON qa.quiz_id = q.quiz_id
+                WHERE qa.user_id = @UserId::uuid";
             
             if (!string.IsNullOrEmpty(status))
-                sql += " AND status = @Status";
+                sql += " AND qa.status = @Status";
             
-            sql += " ORDER BY assigned_at DESC";
+            sql += " ORDER BY qa.assigned_at DESC";
 
-            var parameters = new { UserId = userId, Status = status };
-            var assignments = await _dbService.QueryAsync<dynamic>(sql, parameters);
-
-            var response = assignments.Select(a => new AssignmentResponse
+            var npgsqlParams = new List<NpgsqlParameter>
             {
-                AssignmentId = a.assignment_id,
-                QuizId = a.quiz_id,
-                QuizTitle = a.quiz_title ?? "",
-                QuizDescription = a.quiz_description,
-                Subject = a.subject,
-                Difficulty = a.difficulty,
-                EstimatedMinutes = a.estimated_minutes,
-                UserId = a.user_id,
-                AssignedBy = a.assigned_by,
-                AssignedAt = a.assigned_at,
-                DueDate = a.due_date,
-                Status = a.status,
-                StartedAt = a.started_at,
-                CompletedAt = a.completed_at,
-                Score = a.score,
-                MaxAttempts = a.max_attempts,
-                AttemptsUsed = a.attempts_used,
-                IsMandatory = a.is_mandatory,
-                Notes = a.notes,
-                HoursUntilDue = a.hours_until_due,
-                CompletionTimeMinutes = a.completion_time_minutes
-            }).ToList();
+                new NpgsqlParameter("@UserId", userId)
+            };
+
+            if (!string.IsNullOrEmpty(status))
+            {
+                npgsqlParams.Add(new NpgsqlParameter("@Status", status));
+            }
+
+            var reader = await _dbService.ExecuteQueryAsync(sql, npgsqlParams.ToArray());
+            var response = new List<AssignmentResponse>();
+
+            while (await reader.ReadAsync())
+            {
+                response.Add(new AssignmentResponse
+                {
+                    AssignmentId = reader.GetGuid(reader.GetOrdinal("assignment_id")),
+                    QuizId = reader.GetGuid(reader.GetOrdinal("quiz_id")),
+                    QuizTitle = reader.IsDBNull(reader.GetOrdinal("quiz_title")) ? "" : reader.GetString(reader.GetOrdinal("quiz_title")),
+                    QuizDescription = reader.IsDBNull(reader.GetOrdinal("quiz_description")) ? null : reader.GetString(reader.GetOrdinal("quiz_description")),
+                    Subject = reader.IsDBNull(reader.GetOrdinal("subject")) ? null : reader.GetString(reader.GetOrdinal("subject")),
+                    Difficulty = reader.IsDBNull(reader.GetOrdinal("difficulty")) ? null : reader.GetString(reader.GetOrdinal("difficulty")),
+                    EstimatedMinutes = reader.IsDBNull(reader.GetOrdinal("estimated_minutes")) ? null : reader.GetInt32(reader.GetOrdinal("estimated_minutes")),
+                    UserId = reader.GetGuid(reader.GetOrdinal("user_id")).ToString(),
+                    AssignedBy = reader.IsDBNull(reader.GetOrdinal("assigned_by")) ? null : reader.GetString(reader.GetOrdinal("assigned_by")),
+                    AssignedAt = reader.GetDateTime(reader.GetOrdinal("assigned_at")),
+                    DueDate = reader.IsDBNull(reader.GetOrdinal("due_date")) ? null : reader.GetDateTime(reader.GetOrdinal("due_date")),
+                    Status = reader.GetString(reader.GetOrdinal("status")),
+                    StartedAt = reader.IsDBNull(reader.GetOrdinal("started_at")) ? null : reader.GetDateTime(reader.GetOrdinal("started_at")),
+                    CompletedAt = reader.IsDBNull(reader.GetOrdinal("completed_at")) ? null : reader.GetDateTime(reader.GetOrdinal("completed_at")),
+                    Score = reader.IsDBNull(reader.GetOrdinal("score")) ? null : reader.GetDecimal(reader.GetOrdinal("score")),
+                    MaxAttempts = reader.IsDBNull(reader.GetOrdinal("max_attempts")) ? null : reader.GetInt32(reader.GetOrdinal("max_attempts")),
+                    AttemptsUsed = reader.GetInt32(reader.GetOrdinal("attempts_used")),
+                    IsMandatory = reader.GetBoolean(reader.GetOrdinal("is_mandatory")),
+                    Notes = reader.IsDBNull(reader.GetOrdinal("notes")) ? null : reader.GetString(reader.GetOrdinal("notes"))
+                });
+            }
+
+            await reader.DisposeAsync();
 
             return await req.OkAsync(response);
         }

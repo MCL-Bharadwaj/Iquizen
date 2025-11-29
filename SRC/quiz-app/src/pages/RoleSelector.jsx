@@ -18,7 +18,7 @@ const RoleSelector = ({ isDark, toggleTheme }) => {
       path: '/Player/dashboard',
       gradient: 'from-blue-500 to-cyan-600',
       bgGradient: isDark ? 'from-blue-950/50 to-cyan-950/50' : 'from-blue-50 to-cyan-50',
-      requiredRole: 'Player',
+      requiredRole: ['Player', 'Administrator'],
     },
     {
       id: 'creator',
@@ -28,7 +28,7 @@ const RoleSelector = ({ isDark, toggleTheme }) => {
       path: '/creator/dashboard',
       gradient: 'from-purple-500 to-pink-600',
       bgGradient: isDark ? 'from-purple-950/50 to-pink-950/50' : 'from-purple-50 to-pink-50',
-      requiredRole: ['Tutors', 'Administrator'], // Can be accessed by Tutors or Administrator
+      requiredRole: ['Content Creator', 'Administrator'],
     },
   ];
 
@@ -51,10 +51,10 @@ const RoleSelector = ({ isDark, toggleTheme }) => {
       setAvailableRoles(filtered);
       console.log('Available roles for user:', filtered.map(r => r.title));
 
-      // If user has only one role, auto-navigate to that dashboard
+      // Auto-navigate if user has only one available role
       if (filtered.length === 1) {
-        console.log('Auto-navigating to:', filtered[0].path);
-        setTimeout(() => navigate(filtered[0].path), 500);
+        console.log('Single role detected, auto-navigating to:', filtered[0].path);
+        navigate(filtered[0].path, { replace: true });
       }
     }
   }, [user, navigate, isDark]);

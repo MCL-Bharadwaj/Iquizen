@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BookOpen, Clock, TrendingUp, Award, Play, Loader2 } from 'lucide-react';
-import { quizApi, attemptApi, helpers } from '../../services/api';
+import { BookOpen, Clock, TrendingUp, Award, Play, Loader2, Lock } from 'lucide-react';
+import { quizApi, attemptApi, assignmentApi, helpers } from '../../services/api';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const PlayerDashboard = ({ isDark }) => {
   const navigate = useNavigate();
@@ -14,6 +16,7 @@ const PlayerDashboard = ({ isDark }) => {
   });
   const [recentQuizzes, setRecentQuizzes] = useState([]);
   const [recentAttempts, setRecentAttempts] = useState([]);
+  const [userAttempts, setUserAttempts] = useState([]);
   const userId = helpers.getUserId('Player');
 
   useEffect(() => {
@@ -55,14 +58,35 @@ const PlayerDashboard = ({ isDark }) => {
     try {
       setLoading(true);
       
-      // Fetch available quizzes
-      const quizzesData = await quizApi.getQuizzes({ limit: 10 });
-      console.log('Quizzes data:', quizzesData); // Debug log
-      setRecentQuizzes(quizzesData.data || []); // Backend returns 'data' array
-
-      // Fetch user attempts
+      // Fetch assigned quizzes (assignments with quiz details)
+      const assignmentsData = await assignmentApi.getMyAssignments();
+      console.log('Assignments data:', assignmentsData); // Debug log
+      
+      // Fetch user attempts first (needed for max attempts check)
       const attemptsData = await attemptApi.getUserAttempts(userId);
       console.log('Attempts data:', attemptsData); // Debug log
+      setUserAttempts(attemptsData || []);
+      
+      // Transform assignments to quiz format for display
+      const assignedQuizzes = assignmentsData.map(assignment => ({
+        quizId: assignment.quizId,
+        title: assignment.quizTitle,
+        description: assignment.quizDescription,
+        subject: assignment.subject,
+        difficulty: assignment.difficulty,
+        estimatedMinutes: assignment.estimatedMinutes,
+        assignmentId: assignment.assignmentId,
+        assignedAt: assignment.assignedAt,
+        dueDate: assignment.dueDate,
+        status: assignment.status,
+        isMandatory: assignment.isMandatory,
+        maxAttempts: assignment.maxAttempts,
+        attemptsUsed: assignment.attemptsUsed,
+      }));
+      
+      setRecentQuizzes(assignedQuizzes);
+
+      // Process attempts for recent attempts display
       console.log('Total attempts received:', attemptsData.attempts?.length);
       
       const attempts = attemptsData.attempts || [];
@@ -76,12 +100,12 @@ const PlayerDashboard = ({ isDark }) => {
       
       setRecentAttempts(attempts.slice(0, 5));
 
-      // Calculate stats
+      // Calculate stats based on assignments
       const attemptStats = helpers.calculateAttemptStats(attempts);
       console.log('Calculated stats:', attemptStats);
       
       setStats({
-        totalQuizzes: quizzesData.count || 0,
+        totalQuizzes: assignedQuizzes.length,
         completedAttempts: attemptStats.completed,
         inProgressAttempts: attemptStats.inProgress,
         averageScore: attemptStats.averageScore,
@@ -164,34 +188,79 @@ const PlayerDashboard = ({ isDark }) => {
             </button>
           </div>
           <div className="space-y-3">
-            {recentQuizzes.slice(0, 5).map((quiz) => (
+            {recentQuizzes.slice(0, 5).map((quiz) => {
+              const isMaxAttemptsReached = quiz.maxAttempts && quiz.attemptsUsed >= quiz.maxAttempts;
+              
+              const handleQuizClick = () => {
+                if (isMaxAttemptsReached) {
+                  toast.error(`Maximum attempts (${quiz.maxAttempts}) reached for this quiz`, {
+                    position: 'top-right',
+                    autoClose: 3000,
+                    theme: isDark ? 'dark' : 'light',
+                  });
+                  return;
+                }
+                navigate(`/Player/quiz/${quiz.quizId}`);
+              };
+              
+              return (
               <div
                 key={quiz.quizId}
-                className={`p-4 rounded-xl ${isDark ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-50 hover:bg-gray-100'} transition-colors cursor-pointer`}
-                onClick={() => navigate(`/Player/quiz/${quiz.quizId}`)}
+                className={`p-4 rounded-xl ${
+                  isMaxAttemptsReached
+                    ? isDark ? 'bg-gray-700 opacity-60 cursor-not-allowed' : 'bg-gray-50 opacity-60 cursor-not-allowed'
+                    : isDark ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-50 hover:bg-gray-100'
+                } transition-colors ${
+                  isMaxAttemptsReached ? '' : 'cursor-pointer'
+                }`}
+                onClick={handleQuizClick}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <h3 className={`font-semibold mb-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
                       {quiz.title}
                     </h3>
-                    <div className="flex items-center gap-3 text-sm">
-                      <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                        {quiz.estimatedMinutes || 0} mins
-                      </span>
-                      <span className={`px-2 py-1 rounded text-xs ${
-                        quiz.difficulty === 'easy' ? 'bg-green-500/20 text-green-400' :
-                        quiz.difficulty === 'hard' ? 'bg-red-500/20 text-red-400' :
-                        'bg-yellow-500/20 text-yellow-400'
-                      }`}>
-                        {quiz.difficulty || 'medium'}
-                      </span>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-3 text-sm">
+                        <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                          {quiz.estimatedMinutes || 0} mins
+                        </span>
+                        <span className={`px-2 py-1 rounded text-xs ${
+                          quiz.difficulty === 'easy' ? 'bg-green-500/20 text-green-400' :
+                          quiz.difficulty === 'hard' ? 'bg-red-500/20 text-red-400' :
+                          'bg-yellow-500/20 text-yellow-400'
+                        }`}>
+                          {quiz.difficulty || 'medium'}
+                        </span>
+                        {quiz.isMandatory && (
+                          <span className="text-xs px-2 py-1 rounded bg-orange-500/20 text-orange-400">
+                            Mandatory
+                          </span>
+                        )}
+                      </div>
+                      {quiz.dueDate && (
+                        <span className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+                          Due: {new Date(quiz.dueDate).toLocaleDateString()}
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <Play className="w-5 h-5 text-blue-500" />
+                  <div className="flex flex-col items-center gap-1">
+                    {quiz.maxAttempts && (
+                      <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                        {quiz.attemptsUsed || 0}/{quiz.maxAttempts}
+                      </span>
+                    )}
+                    {isMaxAttemptsReached ? (
+                      <Lock className="w-5 h-5 text-gray-500" />
+                    ) : (
+                      <Play className="w-5 h-5 text-blue-500" />
+                    )}
+                  </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -250,6 +319,7 @@ const PlayerDashboard = ({ isDark }) => {
           )}
         </div>
       </div>
+      <ToastContainer />
     </div>
   );
 };

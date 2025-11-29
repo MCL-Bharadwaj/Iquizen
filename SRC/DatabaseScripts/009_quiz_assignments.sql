@@ -15,7 +15,7 @@ END $$;
 CREATE TABLE IF NOT EXISTS quiz.quiz_assignments (
     assignment_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     quiz_id UUID NOT NULL REFERENCES quiz.quizzes(quiz_id) ON DELETE CASCADE,
-    user_id VARCHAR(255) NOT NULL, -- External user identifier (email, username, or ID from auth system)
+    user_id UUID NOT NULL REFERENCES lms.users(user_id) ON DELETE CASCADE,
     assigned_by VARCHAR(255), -- Who assigned the quiz (teacher, admin, etc.)
     assigned_at TIMESTAMP NOT NULL DEFAULT NOW(),
     due_date TIMESTAMP, -- When the quiz should be completed
