@@ -42,7 +42,7 @@ Use this checklist to track your authentication system implementation progress.
 
 - [ ] **Configure Connection String**
   - [ ] Updated `Functions/local.settings.json`
-  - [ ] PostgresConnectionString is correct
+  - [ ] Db__ConnectionString is correct
   - [ ] Can connect to database
 
 - [ ] **Configure JWT Settings**

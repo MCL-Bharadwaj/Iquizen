@@ -50,16 +50,16 @@ namespace Quizz.Functions
                         var configuration = context.Configuration;
                         Console.WriteLine($"[{DateTime.UtcNow}] Configuration retrieved");
                         
-                        var connectionString = configuration["PostgresConnectionString"] 
-                            ?? Environment.GetEnvironmentVariable("PostgresConnectionString");
+                        var connectionString = configuration["Db__ConnectionString"] 
+                            ?? Environment.GetEnvironmentVariable("Db__ConnectionString");
 
                         Console.WriteLine($"[{DateTime.UtcNow}] Connection string present: {!string.IsNullOrEmpty(connectionString)}");
 
                         if (string.IsNullOrEmpty(connectionString))
                         {
-                            Console.WriteLine($"[{DateTime.UtcNow}] ERROR: PostgresConnectionString not found!");
+                            Console.WriteLine($"[{DateTime.UtcNow}] ERROR: Db__ConnectionString not found!");
                             throw new InvalidOperationException(
-                                "PostgresConnectionString not found in configuration. " +
+                                "Db__ConnectionString not found in configuration. " +
                                 "Set it in local.settings.json or Azure App Settings.");
                         }
 
@@ -73,7 +73,19 @@ namespace Quizz.Functions
                             ?? configuration["Jwt__SecretKey"]
                             ?? Environment.GetEnvironmentVariable("Jwt__SecretKey")
                             ?? throw new InvalidOperationException("JWT Secret not configured");
-                        services.AddSingleton(new TokenService(jwtSecret));
+                        
+                        var jwtIssuer = configuration["Jwt:Issuer"] 
+                            ?? configuration["Jwt__Issuer"]
+                            ?? Environment.GetEnvironmentVariable("Jwt__Issuer")
+                            ?? "Quizz-API";
+                        
+                        var jwtAudience = configuration["Jwt:Audience"] 
+                            ?? configuration["Jwt__Audience"]
+                            ?? Environment.GetEnvironmentVariable("Jwt__Audience")
+                            ?? "Quizz-Users";
+                        
+                        Console.WriteLine($"[{DateTime.UtcNow}] JWT Configuration - Issuer: {jwtIssuer}, Audience: {jwtAudience}, Secret Length: {jwtSecret.Length}");
+                        services.AddSingleton(new TokenService(jwtSecret, jwtIssuer, jwtAudience));
 
                         // Register AuthorizationService for role-based authorization
                         Console.WriteLine($"[{DateTime.UtcNow}] Registering AuthorizationService...");

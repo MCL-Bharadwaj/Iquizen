@@ -83,7 +83,7 @@ public class Startup : FunctionsStartup
 {
     public override void Configure(IFunctionsHostBuilder builder)
     {
-        var connString = Environment.GetEnvironmentVariable("PostgresConnectionString");
+        var connString = Environment.GetEnvironmentVariable("Db__ConnectionString");
         
         // Register DbService and ApiKeyService
         builder.Services.AddDbService(connString);

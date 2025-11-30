@@ -35,7 +35,7 @@ This creates:
 ### 2. Configure App Settings
 Add in Configuration → Application Settings:
 ```
-PostgresConnectionString = Host=mcl-lms-dev.postgres.database.azure.com;Port=5432;Database=postgres;Username=mcladmin;Password=Seattle@2025;SSL Mode=Require;Trust Server Certificate=true;Search Path=quiz
+Db__ConnectionString = Host=mcl-lms-dev.postgres.database.azure.com;Port=5432;Database=postgres;Username=mcladmin;Password=Seattle@2025;SSL Mode=Require;Trust Server Certificate=true;Search Path=quiz
 
 JWT__Secret = [Generate 32+ character secret]
 JWT__Issuer = QuizApp

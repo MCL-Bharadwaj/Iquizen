@@ -67,7 +67,7 @@ az group create --name rg-quizapp-prod --location eastus
    - Add these settings:
 
    ```
-   PostgresConnectionString = Host=mcl-lms-dev.postgres.database.azure.com;Port=5432;Database=postgres;Username=mcladmin;Password=Seattle@2025;SSL Mode=Require;Trust Server Certificate=true;Search Path=quiz
+   Db__ConnectionString = Host=mcl-lms-dev.postgres.database.azure.com;Port=5432;Database=postgres;Username=mcladmin;Password=Seattle@2025;SSL Mode=Require;Trust Server Certificate=true;Search Path=quiz
    
    JWT__Secret = your-super-secret-jwt-key-at-least-32-characters-long-change-this-in-production
    JWT__Issuer = QuizApp
@@ -122,7 +122,7 @@ az functionapp config appsettings set `
   --name func-quizapp-prod `
   --resource-group rg-quizapp-prod `
   --settings `
-    "PostgresConnectionString=Host=mcl-lms-dev.postgres.database.azure.com;Port=5432;Database=postgres;Username=mcladmin;Password=Seattle@2025;SSL Mode=Require;Trust Server Certificate=true;Search Path=quiz" `
+    "Db__ConnectionString=Host=mcl-lms-dev.postgres.database.azure.com;Port=5432;Database=postgres;Username=mcladmin;Password=Seattle@2025;SSL Mode=Require;Trust Server Certificate=true;Search Path=quiz" `
     "JWT__Secret=your-super-secret-jwt-key-at-least-32-characters-long" `
     "JWT__Issuer=QuizApp" `
     "JWT__Audience=QuizAppUsers" `
@@ -257,7 +257,7 @@ curl https://func-quizapp-prod.azurewebsites.net/api/health
 az keyvault create --name kv-quizapp-prod --resource-group rg-quizapp-prod
 
 # Store secrets
-az keyvault secret set --vault-name kv-quizapp-prod --name PostgresConnectionString --value "YOUR_CONNECTION_STRING"
+az keyvault secret set --vault-name kv-quizapp-prod --name Db__ConnectionString --value "YOUR_CONNECTION_STRING"
 az keyvault secret set --vault-name kv-quizapp-prod --name JWTSecret --value "YOUR_JWT_SECRET"
 
 # Grant Function App access
@@ -276,7 +276,7 @@ az functionapp config appsettings set `
   --name func-quizapp-prod `
   --resource-group rg-quizapp-prod `
   --settings `
-    "PostgresConnectionString=@Microsoft.KeyVault(SecretUri=https://kv-quizapp-prod.vault.azure.net/secrets/PostgresConnectionString/)" `
+    "Db__ConnectionString=@Microsoft.KeyVault(SecretUri=https://kv-quizapp-prod.vault.azure.net/secrets/Db__ConnectionString/)" `
     "JWT__Secret=@Microsoft.KeyVault(SecretUri=https://kv-quizapp-prod.vault.azure.net/secrets/JWTSecret/)"
 ```
 

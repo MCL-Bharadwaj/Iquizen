@@ -150,7 +150,7 @@ Add to `local.settings.json`:
   "Values": {
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
     "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
-    "PostgresConnectionString": "Host=localhost;Database=quiz_db;Username=postgres;Password=yourpassword",
+    "Db__ConnectionString": "Host=localhost;Database=quiz_db;Username=postgres;Password=yourpassword",
     "JWT:Secret": "your-very-secret-jwt-key-min-32-chars-recommended",
     "JWT:Issuer": "QuizApp",
     "JWT:Audience": "QuizAppUsers",

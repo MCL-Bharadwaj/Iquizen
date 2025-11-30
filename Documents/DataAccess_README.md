@@ -57,7 +57,7 @@ public class Startup : FunctionsStartup
 {
     public override void Configure(IFunctionsHostBuilder builder)
     {
-        var connectionString = Environment.GetEnvironmentVariable("PostgresConnectionString");
+        var connectionString = Environment.GetEnvironmentVariable("Db__ConnectionString");
         builder.Services.AddDbService(connectionString);
     }
 }
@@ -170,14 +170,14 @@ The service is registered as `Scoped` (not Singleton or Transient) because:
 Configure the following in your Azure Functions Application Settings:
 
 ```
-PostgresConnectionString=Host=myserver.postgres.database.azure.com;Database=quizdb;Username=dbuser;Password=***;SSL Mode=Require;Trust Server Certificate=true
+Db__ConnectionString=Host=myserver.postgres.database.azure.com;Database=quizdb;Username=dbuser;Password=***;SSL Mode=Require;Trust Server Certificate=true
 ```
 
 For local development, add to `local.settings.json`:
 ```json
 {
   "Values": {
-    "PostgresConnectionString": "Host=localhost;Database=quizdb;Username=postgres;Password=***"
+    "Db__ConnectionString": "Host=localhost;Database=quizdb;Username=postgres;Password=***"
   }
 }
 ```

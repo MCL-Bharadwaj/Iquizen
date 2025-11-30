@@ -6,7 +6,7 @@ Click "+ Add" for each setting and copy the exact values:
 
 ---
 
-### 1. PostgresConnectionString
+### 1. Db__ConnectionString
 ```
 Host=mcl-lms-dev.postgres.database.azure.com;Port=5432;Database=postgres;Username=mcladmin;Password=Seattle@2025;SSL Mode=Require;Trust Server Certificate=true;Search Path=quiz
 ```

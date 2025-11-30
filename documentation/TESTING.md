@@ -99,7 +99,7 @@ Edit `c:\CodeBase\Quizz\Functions\local.settings.json`:
   "Values": {
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
     "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
-    "PostgresConnectionString": "Host=localhost;Port=5432;Database=quizdb;Username=postgres;Password=YOUR_PASSWORD",
+    "Db__ConnectionString": "Host=localhost;Port=5432;Database=quizdb;Username=postgres;Password=YOUR_PASSWORD",
     "SwaggerPath": "/internal-docs",
     "SwaggerAuthKey": "your-secret-swagger-key-change-this"
   }
@@ -324,7 +324,7 @@ Current configuration in `local.settings.json`:
 
 | Variable | Purpose | Default Value |
 |----------|---------|---------------|
-| `PostgresConnectionString` | Database connection | `Host=localhost;Database=quizdb;...` |
+| `Db__ConnectionString` | Database connection | `Host=localhost;Database=quizdb;...` |
 | `SwaggerAuthKey` | Swagger UI access | `your-secret-swagger-key-change-this` |
 | `SwaggerPath` | Swagger base path | `/internal-docs` |
 | `FUNCTIONS_WORKER_RUNTIME` | Runtime type | `dotnet-isolated` |

@@ -52,7 +52,7 @@ Edit `local.settings.json`:
 ```json
 {
   "Values": {
-    "PostgresConnectionString": "Host=localhost;Database=quizdb;Username=postgres;Password=yourpassword",
+    "Db__ConnectionString": "Host=localhost;Database=quizdb;Username=postgres;Password=yourpassword",
     "SwaggerPath": "/internal-docs",
     "SwaggerAuthKey": "your-secret-swagger-key-change-this"
   }
@@ -270,7 +270,7 @@ az functionapp config appsettings set \
   --name quiz-api-functions \
   --resource-group quiz-api-rg \
   --settings \
-    PostgresConnectionString="Host=yourserver.postgres.database.azure.com;..." \
+    Db__ConnectionString="Host=yourserver.postgres.database.azure.com;..." \
     SwaggerPath="/internal-docs" \
     SwaggerAuthKey="your-production-secret-key"
 ```
@@ -375,7 +375,7 @@ public async Task<HttpResponseData> MyEndpoint(
 
 ## Troubleshooting
 
-### "PostgresConnectionString not found"
+### "Db__ConnectionString not found"
 - Check `local.settings.json` exists and has the connection string
 - Ensure `local.settings.json` is copied to output directory
 

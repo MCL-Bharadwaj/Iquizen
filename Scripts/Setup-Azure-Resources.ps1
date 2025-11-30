@@ -127,7 +127,7 @@ az functionapp config appsettings set `
     --name $FunctionAppName `
     --resource-group $ResourceGroup `
     --settings `
-        "PostgresConnectionString=$dbConnectionString" `
+        "Db__ConnectionString=$dbConnectionString" `
         "JWT__Secret=$jwtSecret" `
         "JWT__Issuer=QuizApp" `
         "JWT__Audience=QuizAppUsers" `

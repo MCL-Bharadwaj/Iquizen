@@ -109,7 +109,7 @@ Add to `Functions/local.settings.json`:
 ```json
 {
   "Values": {
-    "PostgresConnectionString": "Host=localhost;Database=quiz_db;Username=postgres;Password=yourpassword",
+    "Db__ConnectionString": "Host=localhost;Database=quiz_db;Username=postgres;Password=yourpassword",
     "JWT:Secret": "your-32-character-secret-key-here",
     "JWT:Issuer": "QuizApp",
     "JWT:Audience": "QuizAppUsers",

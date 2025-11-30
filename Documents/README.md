@@ -53,7 +53,7 @@ Quizz/
    ```json
    {
      "Values": {
-       "PostgresConnectionString": "Host=localhost;Database=quiz_db;...",
+       "Db__ConnectionString": "Host=localhost;Database=quiz_db;...",
        "JWT__Secret": "your-secret-key-32-chars-minimum",
        "JWT__Issuer": "QuizApp",
        "JWT__Audience": "QuizAppUsers"

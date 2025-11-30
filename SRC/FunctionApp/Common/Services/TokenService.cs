@@ -107,7 +107,15 @@ public class TokenService
             var tokenHandler = new JwtSecurityTokenHandler();
             var key = Encoding.UTF8.GetBytes(_secretKey);
 
-            tokenHandler.ValidateToken(token, new TokenValidationParameters
+            // First, let's decode the token without validation to inspect it
+            var jwtToken = tokenHandler.ReadJwtToken(token);
+            Console.WriteLine($"[TokenService] Token Header: {jwtToken.Header}");
+            Console.WriteLine($"[TokenService] Token Issuer: {jwtToken.Issuer}");
+            Console.WriteLine($"[TokenService] Token Audience: {string.Join(", ", jwtToken.Audiences)}");
+            Console.WriteLine($"[TokenService] Expected Issuer: {_issuer}");
+            Console.WriteLine($"[TokenService] Expected Audience: {_audience}");
+
+            var validationParameters = new TokenValidationParameters
             {
                 ValidateIssuerSigningKey = true,
                 IssuerSigningKey = new SymmetricSecurityKey(key),
@@ -116,23 +124,45 @@ public class TokenService
                 ValidateAudience = true,
                 ValidAudience = _audience,
                 ValidateLifetime = true,
-                ClockSkew = TimeSpan.Zero
-            }, out SecurityToken validatedToken);
+                ClockSkew = TimeSpan.FromMinutes(5), // Add some clock skew tolerance
+                RequireSignedTokens = true,
+                RequireExpirationTime = true
+            };
 
-            var jwtToken = (JwtSecurityToken)validatedToken;
-            var userIdClaim = jwtToken.Claims.First(x => x.Type == "userId").Value;
-            var userId = Guid.Parse(userIdClaim);
+            tokenHandler.ValidateToken(token, validationParameters, out SecurityToken validatedToken);
+
+            var validatedJwtToken = (JwtSecurityToken)validatedToken;
+            var userIdClaim = validatedJwtToken.Claims.FirstOrDefault(x => x.Type == "userId");
+            
+            if (userIdClaim == null)
+            {
+                Console.WriteLine("[TokenService] ERROR: userId claim not found in token");
+                return (null, new List<string>());
+            }
+
+            if (!Guid.TryParse(userIdClaim.Value, out var userId))
+            {
+                Console.WriteLine($"[TokenService] ERROR: Invalid userId format: {userIdClaim.Value}");
+                return (null, new List<string>());
+            }
 
             // Extract all role claims
-            var roles = jwtToken.Claims
+            var roles = validatedJwtToken.Claims
                 .Where(x => x.Type == "role")
                 .Select(x => x.Value)
                 .ToList();
 
+            Console.WriteLine($"[TokenService] SUCCESS: Validated token for user {userId} with roles: {string.Join(", ", roles)}");
             return (userId, roles);
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"[TokenService] ERROR: Token validation failed - {ex.Message}");
+            if (ex.InnerException != null)
+            {
+                Console.WriteLine($"[TokenService] ERROR: Inner exception - {ex.InnerException.Message}");
+            }
+            Console.WriteLine($"[TokenService] ERROR: Stack trace - {ex.StackTrace}");
             return (null, new List<string>());
         }
     }

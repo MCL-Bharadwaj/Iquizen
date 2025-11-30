@@ -303,7 +303,7 @@
   □ Test database connectivity
 
 □ Azure Functions Backend
-  □ Configure PostgresConnectionString
+  □ Configure Db__ConnectionString
   □ Configure JWT:Secret (32+ chars)
   □ Configure JWT:Issuer & JWT:Audience
   □ Configure JWT:ExpirationMinutes
