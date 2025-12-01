@@ -13,7 +13,7 @@
 -- =============================================
 CREATE TABLE IF NOT EXISTS quiz.players (
     player_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES quiz.users(user_id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES lms.users(user_id) ON DELETE CASCADE,
     player_number VARCHAR(50) NOT NULL UNIQUE,
     enrollment_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     graduation_date TIMESTAMP,

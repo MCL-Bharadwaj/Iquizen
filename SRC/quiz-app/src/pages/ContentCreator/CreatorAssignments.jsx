@@ -63,8 +63,21 @@ const CreatorAssignments = ({ isDark }) => {
       const quizId = quizFilter !== 'all' ? quizFilter : null;
       const status = statusFilter !== 'all' ? statusFilter : null;
       const response = await assignmentApi.getAllAssignments(currentPage, pageSize, quizId, null, status);
-      setAssignments(response.assignments || []);
-      setTotalCount(response.totalCount || 0);
+      
+      console.log('Assignments API response:', response);
+      console.log('Response type:', typeof response, 'isArray:', Array.isArray(response));
+      
+      // Handle direct array response (no pagination wrapper)
+      if (Array.isArray(response)) {
+        console.log('Handling direct array response, count:', response.length);
+        setAssignments(response);
+        setTotalCount(response.length);
+      } else {
+        // Handle paginated response if it exists
+        console.log('Handling paginated response, assignments:', response.assignments?.length || 0);
+        setAssignments(response.assignments || []);
+        setTotalCount(response.totalCount || 0);
+      }
     } catch (error) {
       console.error('Error fetching assignments:', error);
     }
@@ -73,6 +86,8 @@ const CreatorAssignments = ({ isDark }) => {
   const fetchQuizzes = async () => {
     try {
       const response = await quizApi.getQuizzes();
+      console.log('Quizzes API response:', response);
+      // Quiz API returns { data: [...], count, limit, offset }
       setQuizzes(response.data || []);
     } catch (error) {
       console.error('Error fetching quizzes:', error);
@@ -82,7 +97,13 @@ const CreatorAssignments = ({ isDark }) => {
   const fetchPlayers = async () => {
     try {
       const response = await playerApi.getAllPlayers(1, 100); // Get all players for assignment
-      setPlayers(response.players || []);
+      console.log('Players API response:', response);
+      // Handle direct array response or paginated response
+      if (Array.isArray(response)) {
+        setPlayers(response);
+      } else {
+        setPlayers(response.players || []);
+      }
     } catch (error) {
       console.error('Error fetching players:', error);
     }
@@ -135,7 +156,10 @@ const CreatorAssignments = ({ isDark }) => {
 
   const filteredAssignments = assignments.filter(assignment => {
     const matchesSearch = assignment.quizTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         assignment.userId.toLowerCase().includes(searchTerm.toLowerCase());
+                         assignment.userId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (assignment.userFirstName && assignment.userFirstName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                         (assignment.userLastName && assignment.userLastName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                         (assignment.userEmail && assignment.userEmail.toLowerCase().includes(searchTerm.toLowerCase()));
     return matchesSearch;
   });
 
@@ -276,7 +300,16 @@ const CreatorAssignments = ({ isDark }) => {
                       <div className="flex items-center">
                         <Users className="w-5 h-5 text-gray-400 mr-2" />
                         <div className="text-sm">
-                          {assignment.userId}
+                          <div className="font-medium">
+                            {assignment.userFirstName && assignment.userLastName 
+                              ? `${assignment.userFirstName} ${assignment.userLastName}`
+                              : assignment.userId}
+                          </div>
+                          {assignment.userEmail && (
+                            <div className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                              {assignment.userEmail}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>

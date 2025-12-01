@@ -365,7 +365,12 @@ public class AssignmentFunctions
                     q.difficulty,
                     q.estimated_minutes,
                     qa.user_id,
+                    u.first_name as user_first_name,
+                    u.last_name as user_last_name,
+                    u.email as user_email,
                     qa.assigned_by,
+                    ab.first_name as assigned_by_first_name,
+                    ab.last_name as assigned_by_last_name,
                     qa.assigned_at,
                     qa.due_date,
                     qa.status,
@@ -377,19 +382,22 @@ public class AssignmentFunctions
                     qa.notes
                 FROM quiz.quiz_assignments qa
                 INNER JOIN quiz.quizzes q ON qa.quiz_id = q.quiz_id
+                INNER JOIN lms.users u ON qa.user_id = u.user_id
+                LEFT JOIN lms.users ab ON qa.assigned_by ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' 
+                    AND qa.assigned_by::uuid = ab.user_id
                 WHERE 1=1";
             var conditions = new List<string>();
             object parameters = new { }; // Initialize with empty object instead of null
 
             if (!string.IsNullOrEmpty(userId))
             {
-                conditions.Add("user_id = @UserId");
+                conditions.Add("qa.user_id = @UserId");
                 if (!string.IsNullOrEmpty(quizId) && Guid.TryParse(quizId, out var quizGuid))
                 {
-                    conditions.Add("quiz_id = @QuizId");
+                    conditions.Add("qa.quiz_id = @QuizId");
                     if (!string.IsNullOrEmpty(status))
                     {
-                        conditions.Add("status = @Status");
+                        conditions.Add("qa.status = @Status");
                         parameters = new { UserId = userId, QuizId = quizGuid, Status = status };
                     }
                     else
@@ -399,7 +407,7 @@ public class AssignmentFunctions
                 }
                 else if (!string.IsNullOrEmpty(status))
                 {
-                    conditions.Add("status = @Status");
+                    conditions.Add("qa.status = @Status");
                     parameters = new { UserId = userId, Status = status };
                 }
                 else
@@ -409,10 +417,10 @@ public class AssignmentFunctions
             }
             else if (!string.IsNullOrEmpty(quizId) && Guid.TryParse(quizId, out var quizGuid))
             {
-                conditions.Add("quiz_id = @QuizId");
+                conditions.Add("qa.quiz_id = @QuizId");
                 if (!string.IsNullOrEmpty(status))
                 {
-                    conditions.Add("status = @Status");
+                    conditions.Add("qa.status = @Status");
                     parameters = new { QuizId = quizGuid, Status = status };
                 }
                 else
@@ -422,43 +430,110 @@ public class AssignmentFunctions
             }
             else if (!string.IsNullOrEmpty(status))
             {
-                conditions.Add("status = @Status");
+                conditions.Add("qa.status = @Status");
                 parameters = new { Status = status };
             }
 
             if (conditions.Any())
                 sql += " AND " + string.Join(" AND ", conditions);
 
-            sql += " ORDER BY assigned_at DESC";
+            sql += " ORDER BY qa.assigned_at DESC";
 
-            var assignments = await _dbService.QueryAsync<dynamic>(sql, parameters);
-
-            var response = assignments.Select(a => new AssignmentResponse
+            await using var conn = await _dbService.GetConnectionAsync();
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            
+            // Add parameters
+            if (!string.IsNullOrEmpty(userId))
             {
-                AssignmentId = a.assignment_id,
-                QuizId = a.quiz_id,
-                QuizTitle = a.quiz_title ?? "",
-                QuizDescription = a.quiz_description,
-                Subject = a.subject,
-                Difficulty = a.difficulty,
-                EstimatedMinutes = a.estimated_minutes,
-                UserId = a.user_id,
-                AssignedBy = a.assigned_by,
-                AssignedAt = a.assigned_at,
-                DueDate = a.due_date,
-                Status = a.status,
-                StartedAt = a.started_at,
-                CompletedAt = a.completed_at,
-                Score = a.score,
-                MaxAttempts = a.max_attempts,
-                AttemptsUsed = a.attempts_used,
-                IsMandatory = a.is_mandatory,
-                Notes = a.notes,
-                HoursUntilDue = a.hours_until_due,
-                CompletionTimeMinutes = a.completion_time_minutes
-            }).ToList();
+                cmd.Parameters.AddWithValue("UserId", userId);
+                if (!string.IsNullOrEmpty(quizId) && Guid.TryParse(quizId, out var quizGuid))
+                {
+                    cmd.Parameters.AddWithValue("QuizId", quizGuid);
+                    if (!string.IsNullOrEmpty(status))
+                    {
+                        cmd.Parameters.AddWithValue("Status", status);
+                    }
+                }
+                else if (!string.IsNullOrEmpty(status))
+                {
+                    cmd.Parameters.AddWithValue("Status", status);
+                }
+            }
+            else if (!string.IsNullOrEmpty(quizId) && Guid.TryParse(quizId, out var qGuid))
+            {
+                cmd.Parameters.AddWithValue("QuizId", qGuid);
+                if (!string.IsNullOrEmpty(status))
+                {
+                    cmd.Parameters.AddWithValue("Status", status);
+                }
+            }
+            else if (!string.IsNullOrEmpty(status))
+            {
+                cmd.Parameters.AddWithValue("Status", status);
+            }
 
-            return await req.OkAsync(response);
+            var assignments = new List<AssignmentResponse>();
+            await using var reader = await cmd.ExecuteReaderAsync();
+
+            // Pre-calculate ordinals for better readability and performance
+            var assignmentIdOrdinal = reader.GetOrdinal("assignment_id");
+            var quizIdOrdinal = reader.GetOrdinal("quiz_id");
+            var quizTitleOrdinal = reader.GetOrdinal("quiz_title");
+            var quizDescriptionOrdinal = reader.GetOrdinal("quiz_description");
+            var subjectOrdinal = reader.GetOrdinal("subject");
+            var difficultyOrdinal = reader.GetOrdinal("difficulty");
+            var estimatedMinutesOrdinal = reader.GetOrdinal("estimated_minutes");
+            var userIdOrdinal = reader.GetOrdinal("user_id");
+            var userFirstNameOrdinal = reader.GetOrdinal("user_first_name");
+            var userLastNameOrdinal = reader.GetOrdinal("user_last_name");
+            var userEmailOrdinal = reader.GetOrdinal("user_email");
+            var assignedByOrdinal = reader.GetOrdinal("assigned_by");
+            var assignedByFirstNameOrdinal = reader.GetOrdinal("assigned_by_first_name");
+            var assignedByLastNameOrdinal = reader.GetOrdinal("assigned_by_last_name");
+            var assignedAtOrdinal = reader.GetOrdinal("assigned_at");
+            var dueDateOrdinal = reader.GetOrdinal("due_date");
+            var statusOrdinal = reader.GetOrdinal("status");
+            var startedAtOrdinal = reader.GetOrdinal("started_at");
+            var completedAtOrdinal = reader.GetOrdinal("completed_at");
+            var scoreOrdinal = reader.GetOrdinal("score");
+            var maxAttemptsOrdinal = reader.GetOrdinal("max_attempts");
+            var isMandatoryOrdinal = reader.GetOrdinal("is_mandatory");
+            var notesOrdinal = reader.GetOrdinal("notes");
+
+            while (await reader.ReadAsync())
+            {
+                assignments.Add(new AssignmentResponse
+                {
+                    AssignmentId = reader.GetGuid(assignmentIdOrdinal),
+                    QuizId = reader.GetGuid(quizIdOrdinal),
+                    QuizTitle = reader.GetString(quizTitleOrdinal),
+                    QuizDescription = reader.IsDBNull(quizDescriptionOrdinal) ? null : reader.GetString(quizDescriptionOrdinal),
+                    Subject = reader.IsDBNull(subjectOrdinal) ? null : reader.GetString(subjectOrdinal),
+                    Difficulty = reader.IsDBNull(difficultyOrdinal) ? null : reader.GetString(difficultyOrdinal),
+                    EstimatedMinutes = reader.IsDBNull(estimatedMinutesOrdinal) ? null : reader.GetInt32(estimatedMinutesOrdinal),
+                    UserId = reader.GetGuid(userIdOrdinal).ToString(),
+                    UserFirstName = reader.IsDBNull(userFirstNameOrdinal) ? null : reader.GetString(userFirstNameOrdinal),
+                    UserLastName = reader.IsDBNull(userLastNameOrdinal) ? null : reader.GetString(userLastNameOrdinal),
+                    UserEmail = reader.IsDBNull(userEmailOrdinal) ? null : reader.GetString(userEmailOrdinal),
+                    AssignedBy = reader.IsDBNull(assignedByOrdinal) ? null : reader.GetString(assignedByOrdinal),
+                    AssignedByFirstName = reader.IsDBNull(assignedByFirstNameOrdinal) ? null : reader.GetString(assignedByFirstNameOrdinal),
+                    AssignedByLastName = reader.IsDBNull(assignedByLastNameOrdinal) ? null : reader.GetString(assignedByLastNameOrdinal),
+                    AssignedAt = reader.GetDateTime(assignedAtOrdinal),
+                    DueDate = reader.IsDBNull(dueDateOrdinal) ? null : reader.GetDateTime(dueDateOrdinal),
+                    Status = reader.GetString(statusOrdinal),
+                    StartedAt = reader.IsDBNull(startedAtOrdinal) ? null : reader.GetDateTime(startedAtOrdinal),
+                    CompletedAt = reader.IsDBNull(completedAtOrdinal) ? null : reader.GetDateTime(completedAtOrdinal),
+                    Score = reader.IsDBNull(scoreOrdinal) ? null : reader.GetDecimal(scoreOrdinal),
+                    MaxAttempts = reader.IsDBNull(maxAttemptsOrdinal) ? null : reader.GetInt32(maxAttemptsOrdinal),
+                    AttemptsUsed = 0, // This would need to be calculated from attempts table if needed
+                    IsMandatory = reader.GetBoolean(isMandatoryOrdinal),
+                    Notes = reader.IsDBNull(notesOrdinal) ? null : reader.GetString(notesOrdinal),
+                    CreatedAt = reader.GetDateTime(assignedAtOrdinal), // Using assigned_at as created_at
+                    UpdatedAt = reader.GetDateTime(assignedAtOrdinal) // Using assigned_at as updated_at for now
+                });
+            }
+
+            return await req.OkAsync(assignments);
         }
         catch (Exception ex)
         {

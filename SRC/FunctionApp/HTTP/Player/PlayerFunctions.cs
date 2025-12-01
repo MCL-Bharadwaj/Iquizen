@@ -83,9 +83,9 @@ public class PlayerFunctions
                     p.total_score,
                     p.games_played,
                     p.is_active,
-                    u.username,
-                    u.full_name,
-                    u.email
+                    u.email,
+                    u.first_name,
+                    u.last_name
                 FROM quiz.players p
                 INNER JOIN lms.users u ON p.user_id = u.user_id
                 WHERE p.deleted_at IS NULL
@@ -111,9 +111,9 @@ public class PlayerFunctions
                     TotalScore = reader.GetInt32(5),
                     GamesPlayed = reader.GetInt32(6),
                     IsActive = reader.GetBoolean(7),
-                    Username = reader.GetString(8),
-                    FullName = reader.IsDBNull(9) ? null : reader.GetString(9),
-                    Email = reader.IsDBNull(10) ? null : reader.GetString(10)
+                    Username = reader.GetString(8), // Using email as username
+                    FullName = $"{reader.GetString(9)} {reader.GetString(10)}".Trim(), // Combining first_name and last_name
+                    Email = reader.GetString(8)
                 });
             }
 
@@ -170,9 +170,9 @@ public class PlayerFunctions
                     p.total_score,
                     p.games_played,
                     p.is_active,
-                    u.username,
-                    u.full_name,
-                    u.email
+                    u.email,
+                    u.first_name,
+                    u.last_name
                 FROM quiz.players p
                 INNER JOIN lms.users u ON p.user_id = u.user_id
                 WHERE p.player_id = @playerId AND p.deleted_at IS NULL";
@@ -205,9 +205,9 @@ public class PlayerFunctions
                 TotalScore = reader.GetInt32(5),
                 GamesPlayed = reader.GetInt32(6),
                 IsActive = reader.GetBoolean(7),
-                Username = reader.GetString(8),
-                FullName = reader.IsDBNull(9) ? null : reader.GetString(9),
-                Email = reader.IsDBNull(10) ? null : reader.GetString(10)
+                Username = reader.GetString(8), // Using email as username
+                FullName = $"{reader.GetString(9)} {reader.GetString(10)}".Trim(), // Combining first_name and last_name
+                Email = reader.GetString(8)
             };
 
             return await req.OkAsync(player);
@@ -250,7 +250,7 @@ public class PlayerFunctions
             await using var conn = await _dbService.GetConnectionAsync();
 
             // Check if user exists
-            var userCheckSql = "SELECT COUNT(*) FROM lms.users WHERE user_id = @userId AND deleted_at IS NULL";
+            var userCheckSql = "SELECT COUNT(*) FROM lms.users WHERE user_id = @userId AND is_active = TRUE";
             await using var userCheckCmd = new NpgsqlCommand(userCheckSql, conn);
             userCheckCmd.Parameters.AddWithValue("userId", request.UserId);
             var userExists = Convert.ToInt32(await userCheckCmd.ExecuteScalarAsync()) > 0;

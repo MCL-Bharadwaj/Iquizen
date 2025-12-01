@@ -64,7 +64,12 @@ public class AssignmentResponse
     public string? Difficulty { get; set; }
     public int? EstimatedMinutes { get; set; }
     public string UserId { get; set; } = string.Empty;
+    public string? UserFirstName { get; set; }
+    public string? UserLastName { get; set; }
+    public string? UserEmail { get; set; }
     public string? AssignedBy { get; set; }
+    public string? AssignedByFirstName { get; set; }
+    public string? AssignedByLastName { get; set; }
     public DateTime AssignedAt { get; set; }
     public DateTime? DueDate { get; set; }
     public string Status { get; set; } = string.Empty;
