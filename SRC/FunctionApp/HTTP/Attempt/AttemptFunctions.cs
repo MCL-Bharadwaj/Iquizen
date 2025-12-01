@@ -251,7 +251,7 @@ namespace Quizz.Functions.Endpoints.Attempt
                 {
                     AttemptId = reader.GetGuid(0),
                     QuizId = reader.GetGuid(1),
-                    UserId = reader.GetString(2),
+                    UserId = reader.GetGuid(2).ToString(),
                     Status = reader.GetString(3),
                     StartedAt = reader.GetDateTime(4),
                     CompletedAt = reader.IsDBNull(5) ? null : reader.GetDateTime(5),
