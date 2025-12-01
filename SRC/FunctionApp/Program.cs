@@ -77,12 +77,12 @@ namespace Quizz.Functions
                         var jwtIssuer = configuration["Jwt:Issuer"] 
                             ?? configuration["Jwt__Issuer"]
                             ?? Environment.GetEnvironmentVariable("Jwt__Issuer")
-                            ?? "Quizz-API";
+                            ?? "LMS-API";
                         
                         var jwtAudience = configuration["Jwt:Audience"] 
                             ?? configuration["Jwt__Audience"]
                             ?? Environment.GetEnvironmentVariable("Jwt__Audience")
-                            ?? "Quizz-Users";
+                            ?? "LMS-Client";
                         
                         Console.WriteLine($"[{DateTime.UtcNow}] JWT Configuration - Issuer: {jwtIssuer}, Audience: {jwtAudience}, Secret Length: {jwtSecret.Length}");
                         services.AddSingleton(new TokenService(jwtSecret, jwtIssuer, jwtAudience));
