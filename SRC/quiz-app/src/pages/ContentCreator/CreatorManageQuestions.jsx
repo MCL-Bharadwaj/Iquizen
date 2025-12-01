@@ -9,7 +9,8 @@ import {
   Save,
   X,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Edit2
 } from 'lucide-react';
 
 const CreatorManageQuestions = ({ isDark }) => {
@@ -21,6 +22,10 @@ const CreatorManageQuestions = ({ isDark }) => {
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState(null);
+  const [showEditTitleModal, setShowEditTitleModal] = useState(false);
+  const [editedTitle, setEditedTitle] = useState('');
+  const [editedDescription, setEditedDescription] = useState('');
+  const [updatingTitle, setUpdatingTitle] = useState(false);
 
   useEffect(() => {
     fetchQuizAndQuestions();
@@ -74,6 +79,41 @@ const CreatorManageQuestions = ({ isDark }) => {
     handleCloseForm();
   };
 
+  const handleEditTitle = () => {
+    setEditedTitle(quiz?.title || '');
+    setEditedDescription(quiz?.description || '');
+    setShowEditTitleModal(true);
+  };
+
+  const handleUpdateTitle = async () => {
+    if (!editedTitle.trim()) {
+      alert('Quiz title cannot be empty');
+      return;
+    }
+
+    setUpdatingTitle(true);
+    try {
+      await quizApi.updateQuiz(quizId, {
+        title: editedTitle,
+        description: editedDescription,
+      });
+      
+      // Update local state
+      setQuiz({
+        ...quiz,
+        title: editedTitle,
+        description: editedDescription,
+      });
+      
+      setShowEditTitleModal(false);
+    } catch (error) {
+      console.error('Error updating quiz:', error);
+      alert('Failed to update quiz title');
+    } finally {
+      setUpdatingTitle(false);
+    }
+  };
+
   const getQuestionTypeLabel = (type) => {
     const labels = {
       multiple_choice_single: 'Multiple Choice (Single)',
@@ -107,10 +147,25 @@ const CreatorManageQuestions = ({ isDark }) => {
         </button>
 
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className={`text-4xl font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-              {quiz?.title || 'Quiz Questions'}
-            </h1>
+          <div className="flex-1">
+            <div className="flex items-center gap-3 mb-2">
+              <h1 className={`text-4xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                {quiz?.title || 'Quiz Questions'}
+              </h1>
+              <button
+                onClick={handleEditTitle}
+                className={`
+                  p-2 rounded-lg transition-colors
+                  ${isDark 
+                    ? 'hover:bg-gray-700 text-gray-400 hover:text-blue-400' 
+                    : 'hover:bg-gray-100 text-gray-600 hover:text-blue-600'
+                  }
+                `}
+                title="Edit quiz title"
+              >
+                <Edit2 className="w-5 h-5" />
+              </button>
+            </div>
             <p className={`text-lg ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
               {quiz?.description || 'Manage questions for this quiz'}
             </p>
@@ -183,6 +238,105 @@ const CreatorManageQuestions = ({ isDark }) => {
           onClose={handleCloseForm}
           onSave={handleQuestionSaved}
         />
+      )}
+
+      {/* Edit Quiz Title Modal */}
+      {showEditTitleModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className={`
+            max-w-2xl w-full rounded-lg
+            ${isDark ? 'bg-gray-800' : 'bg-white'}
+          `}>
+            <div className={`
+              p-6 border-b flex items-center justify-between
+              ${isDark ? 'border-gray-700' : 'border-gray-200'}
+            `}>
+              <h2 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                Edit Quiz Details
+              </h2>
+              <button
+                onClick={() => setShowEditTitleModal(false)}
+                className={`
+                  p-2 rounded-lg transition-colors
+                  ${isDark ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-100 text-gray-600'}
+                `}
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Quiz Title */}
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
+                  Quiz Title <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={editedTitle}
+                  onChange={(e) => setEditedTitle(e.target.value)}
+                  placeholder="Enter quiz title"
+                  className={`
+                    w-full px-4 py-2 rounded-lg border transition-colors
+                    ${isDark 
+                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                    }
+                  `}
+                />
+              </div>
+
+              {/* Quiz Description */}
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
+                  Description
+                </label>
+                <textarea
+                  value={editedDescription}
+                  onChange={(e) => setEditedDescription(e.target.value)}
+                  rows={4}
+                  placeholder="Enter quiz description"
+                  className={`
+                    w-full px-4 py-2 rounded-lg border transition-colors resize-none
+                    ${isDark 
+                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                    }
+                  `}
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-4 justify-end pt-4 border-t">
+                <button
+                  type="button"
+                  onClick={() => setShowEditTitleModal(false)}
+                  className={`
+                    px-6 py-3 rounded-lg font-medium transition-colors
+                    ${isDark ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}
+                  `}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleUpdateTitle}
+                  disabled={updatingTitle || !editedTitle.trim()}
+                  className={`
+                    flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors
+                    ${updatingTitle || !editedTitle.trim()
+                      ? 'bg-gray-400 cursor-not-allowed' 
+                      : 'bg-blue-600 hover:bg-blue-700'
+                    }
+                    text-white
+                  `}
+                >
+                  <Save className="w-5 h-5" />
+                  <span>{updatingTitle ? 'Updating...' : 'Update Quiz'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
