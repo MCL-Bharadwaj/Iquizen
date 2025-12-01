@@ -33,7 +33,7 @@ namespace Quizz.Functions.Endpoints.Attempt
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _authService = authService ?? throw new ArgumentNullException(nameof(authService));
         }
-
+///HI
         [Function("StartAttempt")]
         [OpenApiOperation(
             operationId: "StartAttempt",
