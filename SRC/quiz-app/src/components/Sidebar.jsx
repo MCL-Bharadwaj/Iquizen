@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import authService from '../services/auth';
+import { useAuth } from '../context/AuthContext';
 import {
   Home,
   BookOpen,
@@ -16,13 +16,15 @@ import {
   ChevronRight,
   GraduationCap,
   RefreshCw,
-  HelpCircle
+  HelpCircle,
+  Users
 } from 'lucide-react';
 
 const Sidebar = ({ isDark, toggleTheme, role = 'Player' }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const { logout, user } = useAuth();
 
   // Role-specific menu items
   const menuItemsByRole = {
@@ -34,6 +36,7 @@ const Sidebar = ({ isDark, toggleTheme, role = 'Player' }) => {
     creator: [
       { icon: Home, label: 'Dashboard', path: '/creator/dashboard' },
       { icon: BookOpen, label: 'Quizzes', path: '/creator/quizzes' },
+      { icon: Users, label: 'Assignments', path: '/creator/assignments' },
       { icon: HelpCircle, label: 'Questions', path: '/creator/questions' },
     ],
   };
@@ -60,13 +63,13 @@ const Sidebar = ({ isDark, toggleTheme, role = 'Player' }) => {
   const isActive = (path) => location.pathname === path;
 
   const handleLogout = () => {
-    authService.logout();
-    navigate('/login');
+    logout();
+    navigate('/login', { replace: true });
   };
 
   const handleSwitchRole = () => {
     // Navigate back to role selector
-    navigate('/');
+    navigate('/role-selector');
   };
 
   return (
@@ -133,7 +136,7 @@ const Sidebar = ({ isDark, toggleTheme, role = 'Player' }) => {
 
       {/* Bottom Actions */}
       <div className={`p-2 space-y-1 border-t ${isDark ? 'border-gray-800' : 'border-gray-200'}`}>
-        {authService.hasMultipleRoles() && (
+        {user?.roles && user.roles.length > 1 && (
           <button
             onClick={handleSwitchRole}
             className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors ${

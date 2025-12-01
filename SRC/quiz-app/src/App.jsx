@@ -23,6 +23,7 @@ import CreatorDashboard from './pages/ContentCreator/CreatorDashboard';
 import CreatorQuizzes from './pages/ContentCreator/CreatorQuizzes';
 import CreatorCreateQuiz from './pages/ContentCreator/CreatorCreateQuiz';
 import CreatorManageQuestions from './pages/ContentCreator/CreatorManageQuestions';
+import CreatorAssignments from './pages/ContentCreator/CreatorAssignments';
 
 // Questions Page
 import Questions from './pages/Questions';
@@ -97,6 +98,7 @@ function App() {
                     <Route path="/" element={<Navigate to="/creator/dashboard" replace />} />
                     <Route path="/dashboard" element={<CreatorDashboard isDark={isDark} />} />
                     <Route path="/quizzes" element={<CreatorQuizzes isDark={isDark} />} />
+                    <Route path="/assignments" element={<CreatorAssignments isDark={isDark} />} />
                     <Route path="/quiz/create" element={<CreatorCreateQuiz isDark={isDark} />} />
                     <Route path="/quiz/:quizId/questions" element={<CreatorManageQuestions isDark={isDark} />} />
                     <Route path="/questions" element={<Questions isDark={isDark} />} />

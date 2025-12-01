@@ -28,7 +28,7 @@ const RoleSelector = ({ isDark, toggleTheme }) => {
       path: '/creator/dashboard',
       gradient: 'from-purple-500 to-pink-600',
       bgGradient: isDark ? 'from-purple-950/50 to-pink-950/50' : 'from-purple-50 to-pink-50',
-      requiredRole: ['Content Creator', 'Administrator'],
+      requiredRole: ['Tutors', 'Administrator'],
     },
   ];
 

@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, BookOpen, ClipboardList, PenTool, User } from 'lucide-react';
+import { Home, BookOpen, ClipboardList, PenTool, User, Users } from 'lucide-react';
 
 /**
  * BottomTabBar - Fixed bottom navigation with profile tab
@@ -17,6 +17,7 @@ const BottomTabBar = ({ isDark, role, onProfileClick }) => {
     creator: [
       { icon: Home, label: 'Dashboard', path: '/creator/dashboard' },
       { icon: BookOpen, label: 'Quizzes', path: '/creator/quizzes' },
+      { icon: Users, label: 'Assignments', path: '/creator/assignments' },
       { icon: PenTool, label: 'Create', path: '/creator/quiz/create' },
     ],
   };

@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogOut, RefreshCw, Moon, Sun, User, Mail, X } from 'lucide-react';
-import authService from '../../services/auth';
+import { useAuth } from '../../context/AuthContext';
 
 /**
  * ProfileMenu - Bottom sheet with user settings
@@ -9,6 +9,7 @@ import authService from '../../services/auth';
  */
 const ProfileMenu = ({ isOpen, onClose, isDark, toggleTheme, role }) => {
   const navigate = useNavigate();
+  const { logout, user } = useAuth();
 
   // Prevent body scroll when menu is open
   useEffect(() => {
@@ -51,18 +52,14 @@ const ProfileMenu = ({ isOpen, onClose, isDark, toggleTheme, role }) => {
   }, [isOpen, onClose]);
 
   const handleLogout = () => {
-    authService.logout();
-    navigate('/login');
+    logout();
+    navigate('/login', { replace: true });
   };
 
   const handleSwitchRole = () => {
-    navigate('/');
+    navigate('/role-selector');
     onClose();
   };
-
-  // Get user info from localStorage
-  const userStr = localStorage.getItem('user');
-  const user = userStr ? JSON.parse(userStr) : null;
 
   return (
     <div

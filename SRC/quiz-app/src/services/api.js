@@ -406,6 +406,65 @@ export const assignmentApi = {
     }
   },
 
+  // Get all assignments (for content creators/admins)
+  getAllAssignments: async (page = 1, pageSize = 20, quizId = null, userId = null, status = null) => {
+    try {
+      const params = { page, pageSize };
+      if (quizId) params.quizId = quizId;
+      if (userId) params.userId = userId;
+      if (status) params.status = status;
+      const response = await apiClient.get('/assignments', { params });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching assignments:', error);
+      throw error;
+    }
+  },
+
+  // Create a single assignment
+  createAssignment: async (assignmentData) => {
+    try {
+      const response = await apiClient.post('/assignments', assignmentData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating assignment:', error);
+      throw error;
+    }
+  },
+
+  // Create bulk assignments
+  createBulkAssignments: async (bulkAssignmentData) => {
+    try {
+      const response = await apiClient.post('/assignments/bulk', bulkAssignmentData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating bulk assignments:', error);
+      throw error;
+    }
+  },
+
+  // Update assignment
+  updateAssignment: async (assignmentId, updateData) => {
+    try {
+      const response = await apiClient.put(`/assignments/${assignmentId}`, updateData);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating assignment:', error);
+      throw error;
+    }
+  },
+
+  // Delete assignment
+  deleteAssignment: async (assignmentId) => {
+    try {
+      const response = await apiClient.delete(`/assignments/${assignmentId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting assignment:', error);
+      throw error;
+    }
+  },
+
   // Get specific assignment by ID
   getAssignmentById: async (assignmentId) => {
     try {
@@ -437,6 +496,32 @@ export const assignmentApi = {
       return response.data;
     } catch (error) {
       console.error('Error completing assignment:', error);
+      throw error;
+    }
+  },
+};
+
+// ==================== PLAYER API ====================
+export const playerApi = {
+  // Get all players (for content creators/admins)
+  getAllPlayers: async (page = 1, pageSize = 20) => {
+    try {
+      const params = { page, pageSize };
+      const response = await apiClient.get('/players', { params });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching players:', error);
+      throw error;
+    }
+  },
+
+  // Get player by ID
+  getPlayerById: async (playerId) => {
+    try {
+      const response = await apiClient.get(`/players/${playerId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching player:', error);
       throw error;
     }
   },

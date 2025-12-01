@@ -355,26 +355,75 @@ public class AssignmentFunctions
             var status = query["status"];
 
             // Build SQL query with filters
-            var sql = "SELECT * FROM quiz.v_user_assignments WHERE 1=1";
+            var sql = @"
+                SELECT 
+                    qa.assignment_id,
+                    qa.quiz_id,
+                    q.title as quiz_title,
+                    q.description as quiz_description,
+                    q.subject,
+                    q.difficulty,
+                    q.estimated_minutes,
+                    qa.user_id,
+                    qa.assigned_by,
+                    qa.assigned_at,
+                    qa.due_date,
+                    qa.status,
+                    qa.started_at,
+                    qa.completed_at,
+                    qa.score,
+                    qa.max_attempts,
+                    qa.is_mandatory,
+                    qa.notes
+                FROM quiz.quiz_assignments qa
+                INNER JOIN quiz.quizzes q ON qa.quiz_id = q.quiz_id
+                WHERE 1=1";
             var conditions = new List<string>();
-            var parameters = new Dictionary<string, object>();
+            object parameters = new { }; // Initialize with empty object instead of null
 
             if (!string.IsNullOrEmpty(userId))
             {
                 conditions.Add("user_id = @UserId");
-                parameters["UserId"] = userId;
+                if (!string.IsNullOrEmpty(quizId) && Guid.TryParse(quizId, out var quizGuid))
+                {
+                    conditions.Add("quiz_id = @QuizId");
+                    if (!string.IsNullOrEmpty(status))
+                    {
+                        conditions.Add("status = @Status");
+                        parameters = new { UserId = userId, QuizId = quizGuid, Status = status };
+                    }
+                    else
+                    {
+                        parameters = new { UserId = userId, QuizId = quizGuid };
+                    }
+                }
+                else if (!string.IsNullOrEmpty(status))
+                {
+                    conditions.Add("status = @Status");
+                    parameters = new { UserId = userId, Status = status };
+                }
+                else
+                {
+                    parameters = new { UserId = userId };
+                }
             }
-
-            if (!string.IsNullOrEmpty(quizId) && Guid.TryParse(quizId, out var quizGuid))
+            else if (!string.IsNullOrEmpty(quizId) && Guid.TryParse(quizId, out var quizGuid))
             {
                 conditions.Add("quiz_id = @QuizId");
-                parameters["QuizId"] = quizGuid;
+                if (!string.IsNullOrEmpty(status))
+                {
+                    conditions.Add("status = @Status");
+                    parameters = new { QuizId = quizGuid, Status = status };
+                }
+                else
+                {
+                    parameters = new { QuizId = quizGuid };
+                }
             }
-
-            if (!string.IsNullOrEmpty(status))
+            else if (!string.IsNullOrEmpty(status))
             {
                 conditions.Add("status = @Status");
-                parameters["Status"] = status;
+                parameters = new { Status = status };
             }
 
             if (conditions.Any())
@@ -629,36 +678,36 @@ public class AssignmentFunctions
 
             // Build dynamic update query
             var setClauses = new List<string>();
-            var parameters = new Dictionary<string, object> { ["AssignmentId"] = assignmentGuid };
+            var parameterValues = new List<(string key, object value)> { ("AssignmentId", assignmentGuid) };
 
             if (updateRequest.DueDate.HasValue)
             {
                 setClauses.Add("due_date = @DueDate");
-                parameters["DueDate"] = updateRequest.DueDate.Value;
+                parameterValues.Add(("DueDate", updateRequest.DueDate.Value));
             }
 
             if (updateRequest.MaxAttempts.HasValue)
             {
                 setClauses.Add("max_attempts = @MaxAttempts");
-                parameters["MaxAttempts"] = updateRequest.MaxAttempts.Value;
+                parameterValues.Add(("MaxAttempts", updateRequest.MaxAttempts.Value));
             }
 
             if (updateRequest.IsMandatory.HasValue)
             {
                 setClauses.Add("is_mandatory = @IsMandatory");
-                parameters["IsMandatory"] = updateRequest.IsMandatory.Value;
+                parameterValues.Add(("IsMandatory", updateRequest.IsMandatory.Value));
             }
 
             if (updateRequest.Notes != null)
             {
                 setClauses.Add("notes = @Notes");
-                parameters["Notes"] = updateRequest.Notes;
+                parameterValues.Add(("Notes", updateRequest.Notes));
             }
 
             if (!string.IsNullOrEmpty(updateRequest.Status))
             {
                 setClauses.Add("status = @Status");
-                parameters["Status"] = updateRequest.Status;
+                parameterValues.Add(("Status", updateRequest.Status));
             }
 
             if (!setClauses.Any())
@@ -670,6 +719,8 @@ public class AssignmentFunctions
                 WHERE assignment_id = @AssignmentId
                 RETURNING assignment_id";
 
+            // Create anonymous object for parameters
+            var parameters = parameterValues.ToDictionary(p => p.key, p => p.value);
             var result = await _dbService.QuerySingleAsync<dynamic>(sql, parameters);
 
             if (result == null)
@@ -814,7 +865,7 @@ public class AssignmentFunctions
             var result = await _dbService.QuerySingleAsync<dynamic>(sql, new 
             { 
                 AssignmentId = assignmentGuid,
-                completeRequest.Score
+                Score = completeRequest.Score
             });
 
             if (result == null)

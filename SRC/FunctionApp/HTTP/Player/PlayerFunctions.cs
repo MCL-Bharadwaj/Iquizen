@@ -1,38 +1,42 @@
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
+using Quizz.Common.Extensions;
+using Quizz.Common.Services;
+using Quizz.DataAccess;
+using Quizz.DataModel.Dtos;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
 using Microsoft.OpenApi.Models;
 using System.Net;
 using Npgsql;
-using Quizz.DataModel.Dtos;
-using Quizz.DataAccess;
-using Quizz.Common.Services;
 
-
-namespace Quizz.Functions.Endpoints.Quiz;
+namespace Quizz.Functions.Player;
 
 /// <summary>
-/// Player endpoints for CRUD operations and quiz access
+/// Azure Functions for managing players - Complete CRUD operations
+/// Only accessible by: Administrator, Tutors, Player (for own data)
 /// </summary>
-public class PlayerEndpoints
+public class PlayerFunctions
 {
-    private readonly ILogger<PlayerEndpoints> _logger;
+    private readonly ILogger<PlayerFunctions> _logger;
     private readonly IDbService _dbService;
-    private readonly TokenService _tokenService;
+    private readonly AuthorizationService _authService;
 
-    public PlayerEndpoints(ILogger<PlayerEndpoints> logger, IDbService dbService, TokenService tokenService)
+    public PlayerFunctions(
+        ILogger<PlayerFunctions> logger,
+        IDbService dbService,
+        AuthorizationService authService)
     {
         _logger = logger;
         _dbService = dbService;
-        _tokenService = tokenService;
+        _authService = authService;
     }
 
     /// <summary>
+    /// Get all players
     /// GET /api/players
-    /// Get all players (Admin only)
+    /// Requires: Administrator role
     /// </summary>
     [Function("GetAllPlayers")]
     [OpenApiOperation(operationId: "GetAllPlayers", tags: new[] { "players" }, Summary = "Get all players", Description = "Get paginated list of all players (Admin only)")]
@@ -40,26 +44,31 @@ public class PlayerEndpoints
     [OpenApiParameter(name: "page", In = ParameterLocation.Query, Required = false, Type = typeof(int), Description = "Page number (default: 1)")]
     [OpenApiParameter(name: "pageSize", In = ParameterLocation.Query, Required = false, Type = typeof(int), Description = "Page size (default: 20)")]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json", bodyType: typeof(PaginatedResponse<PlayerDto>), Description = "Paginated list of players")]
-    [OpenApiResponseWithBody(statusCode: HttpStatusCode.Unauthorized, contentType: "application/json", bodyType: typeof(object), Description = "Authentication required or not admin")]
-    public async Task<IActionResult> GetAllPlayers(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "players")] HttpRequest req)
+    [OpenApiResponseWithBody(statusCode: HttpStatusCode.Unauthorized, contentType: "application/json", bodyType: typeof(object), Description = "Authentication required")]
+    public async Task<HttpResponseData> GetAllPlayers(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "players")] HttpRequestData req)
     {
+        _logger.LogInformation("Getting all players");
+
         try
         {
-            var (userId, roles) = await AuthorizeRequest(req);
-            if (userId == null || !HasAnyRole(roles, "Administrator"))
-            {
-                return new UnauthorizedObjectResult(new { error = "Admin access required" });
-            }
+            // Validate token and authorize (Administrator only)
+            var authResult = await _authService.ValidateAndAuthorizeAsync(req, "Administrator");
+            if (!authResult.IsAuthorized)
+                return authResult.ErrorResponse!;
 
-            var page = int.TryParse(req.Query["page"], out var p) ? p : 1;
-            var pageSize = int.TryParse(req.Query["pageSize"], out var ps) ? ps : 20;
+            // Get query parameters
+            var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
+            var page = int.TryParse(query["page"], out var p) ? p : 1;
+            var pageSize = int.TryParse(query["pageSize"], out var ps) ? ps : 20;
             var offset = (page - 1) * pageSize;
 
             await using var conn = await _dbService.GetConnectionAsync();
 
             // Get total count
-            var countSql = "SELECT COUNT(*) FROM quiz.players WHERE deleted_at IS NULL";
+            var countSql = @"SELECT COUNT(*) FROM quiz.players p 
+                            INNER JOIN lms.users u ON p.user_id = u.user_id 
+                            WHERE p.deleted_at IS NULL";
             await using var countCmd = new NpgsqlCommand(countSql, conn);
             var totalCount = Convert.ToInt32(await countCmd.ExecuteScalarAsync());
 
@@ -117,18 +126,19 @@ public class PlayerEndpoints
                 TotalPages = (int)Math.Ceiling((double)totalCount / pageSize)
             };
 
-            return new OkObjectResult(response);
+            return await req.OkAsync(response);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting players");
-            return new StatusCodeResult(StatusCodes.Status500InternalServerError);
+            return await req.InternalServerErrorAsync("Error getting players");
         }
     }
 
     /// <summary>
+    /// Get player by ID
     /// GET /api/players/{id}
-    /// Get player by ID (Admin or own profile)
+    /// Requires: Administrator or Player (own profile)
     /// </summary>
     [Function("GetPlayerById")]
     [OpenApiOperation(operationId: "GetPlayerById", tags: new[] { "players" }, Summary = "Get player by ID", Description = "Get player details by ID (Admin or own profile)")]
@@ -137,17 +147,16 @@ public class PlayerEndpoints
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json", bodyType: typeof(PlayerDto), Description = "Player details")]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.NotFound, contentType: "application/json", bodyType: typeof(object), Description = "Player not found")]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.Unauthorized, contentType: "application/json", bodyType: typeof(object), Description = "Authentication required")]
-    public async Task<IActionResult> GetPlayerById(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "players/{id}")] HttpRequest req,
+    public async Task<HttpResponseData> GetPlayerById(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "players/{id}")] HttpRequestData req,
         Guid id)
     {
         try
         {
-            var (userId, roles) = await AuthorizeRequest(req);
-            if (userId == null || !HasAnyRole(roles, "Administrator", "Player"))
-            {
-                return new UnauthorizedObjectResult(new { error = "Admin or Player access required" });
-            }
+            // Validate token and authorize
+            var authResult = await _authService.ValidateAndAuthorizeAsync(req, "Administrator", "Player");
+            if (!authResult.IsAuthorized)
+                return authResult.ErrorResponse!;
 
             await using var conn = await _dbService.GetConnectionAsync();
 
@@ -175,15 +184,15 @@ public class PlayerEndpoints
 
             if (!await reader.ReadAsync())
             {
-                return new NotFoundObjectResult(new { error = "Player not found" });
+                return await req.NotFoundAsync("Player not found");
             }
 
             var playerUserId = reader.GetGuid(1);
 
             // Check authorization: admin can see all, player can only see own profile
-            if (!HasAnyRole(roles, "Administrator") && userId.Value != playerUserId)
+            if (!authResult.HasAnyRole("Administrator") && authResult.UserId != playerUserId)
             {
-                return new UnauthorizedObjectResult(new { error = "Access denied" });
+                return await req.UnauthorizedAsync("Access denied");
             }
 
             var player = new PlayerDto
@@ -201,18 +210,19 @@ public class PlayerEndpoints
                 Email = reader.IsDBNull(10) ? null : reader.GetString(10)
             };
 
-            return new OkObjectResult(player);
+            return await req.OkAsync(player);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting player by ID");
-            return new StatusCodeResult(StatusCodes.Status500InternalServerError);
+            return await req.InternalServerErrorAsync("Error getting player by ID");
         }
     }
 
     /// <summary>
+    /// Create new player
     /// POST /api/players
-    /// Create new player (Admin only)
+    /// Requires: Administrator role
     /// </summary>
     [Function("CreatePlayer")]
     [OpenApiOperation(operationId: "CreatePlayer", tags: new[] { "players" }, Summary = "Create player", Description = "Create a new player (Admin only)")]
@@ -221,21 +231,20 @@ public class PlayerEndpoints
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.Created, contentType: "application/json", bodyType: typeof(PlayerDto), Description = "Player created")]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.BadRequest, contentType: "application/json", bodyType: typeof(object), Description = "Invalid request")]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.Unauthorized, contentType: "application/json", bodyType: typeof(object), Description = "Admin access required")]
-    public async Task<IActionResult> CreatePlayer(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "players")] HttpRequest req)
+    public async Task<HttpResponseData> CreatePlayer(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "players")] HttpRequestData req)
     {
         try
         {
-            var (userId, roles) = await AuthorizeRequest(req);
-            if (userId == null || !HasAnyRole(roles, "Administrator"))
-            {
-                return new UnauthorizedObjectResult(new { error = "Admin access required" });
-            }
+            // Validate token and authorize (Administrator only)
+            var authResult = await _authService.ValidateAndAuthorizeAsync(req, "Administrator");
+            if (!authResult.IsAuthorized)
+                return authResult.ErrorResponse!;
 
             var request = await req.ReadFromJsonAsync<CreatePlayerRequest>();
             if (request == null)
             {
-                return new BadRequestObjectResult(new { error = "Invalid request body" });
+                return await req.BadRequestAsync("Invalid request body");
             }
 
             await using var conn = await _dbService.GetConnectionAsync();
@@ -248,7 +257,7 @@ public class PlayerEndpoints
 
             if (!userExists)
             {
-                return new BadRequestObjectResult(new { error = "User not found" });
+                return await req.BadRequestAsync("User not found");
             }
 
             // Check if player already exists for this user
@@ -259,7 +268,7 @@ public class PlayerEndpoints
 
             if (playerExists)
             {
-                return new BadRequestObjectResult(new { error = "Player already exists for this user" });
+                return await req.BadRequestAsync("Player already exists for this user");
             }
 
             var sql = @"
@@ -288,18 +297,19 @@ public class PlayerEndpoints
                 IsActive = reader.GetBoolean(7)
             };
 
-            return new ObjectResult(player) { StatusCode = StatusCodes.Status201Created };
+            return await req.CreatedAsync(player);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating player");
-            return new StatusCodeResult(StatusCodes.Status500InternalServerError);
+            return await req.InternalServerErrorAsync("Error creating player");
         }
     }
 
     /// <summary>
+    /// Update player
     /// PUT /api/players/{id}
-    /// Update player (Admin only)
+    /// Requires: Administrator role
     /// </summary>
     [Function("UpdatePlayer")]
     [OpenApiOperation(operationId: "UpdatePlayer", tags: new[] { "players" }, Summary = "Update player", Description = "Update player details (Admin only)")]
@@ -309,22 +319,21 @@ public class PlayerEndpoints
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json", bodyType: typeof(PlayerDto), Description = "Player updated")]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.NotFound, contentType: "application/json", bodyType: typeof(object), Description = "Player not found")]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.Unauthorized, contentType: "application/json", bodyType: typeof(object), Description = "Admin access required")]
-    public async Task<IActionResult> UpdatePlayer(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "players/{id}")] HttpRequest req,
+    public async Task<HttpResponseData> UpdatePlayer(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "players/{id}")] HttpRequestData req,
         Guid id)
     {
         try
         {
-            var (userId, roles) = await AuthorizeRequest(req);
-            if (userId == null || !HasAnyRole(roles, "Administrator"))
-            {
-                return new UnauthorizedObjectResult(new { error = "Admin access required" });
-            }
+            // Validate token and authorize (Administrator only)
+            var authResult = await _authService.ValidateAndAuthorizeAsync(req, "Administrator");
+            if (!authResult.IsAuthorized)
+                return authResult.ErrorResponse!;
 
             var request = await req.ReadFromJsonAsync<UpdatePlayerRequest>();
             if (request == null)
             {
-                return new BadRequestObjectResult(new { error = "Invalid request body" });
+                return await req.BadRequestAsync("Invalid request body");
             }
 
             await using var conn = await _dbService.GetConnectionAsync();
@@ -337,7 +346,7 @@ public class PlayerEndpoints
 
             if (!exists)
             {
-                return new NotFoundObjectResult(new { error = "Player not found" });
+                return await req.NotFoundAsync("Player not found");
             }
 
             var sql = @"
@@ -375,18 +384,19 @@ public class PlayerEndpoints
                 IsActive = reader.GetBoolean(7)
             };
 
-            return new OkObjectResult(player);
+            return await req.OkAsync(player);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error updating player");
-            return new StatusCodeResult(StatusCodes.Status500InternalServerError);
+            return await req.InternalServerErrorAsync("Error updating player");
         }
     }
 
     /// <summary>
+    /// Delete player (soft delete)
     /// DELETE /api/players/{id}
-    /// Delete player (Admin only) - Soft delete
+    /// Requires: Administrator role
     /// </summary>
     [Function("DeletePlayer")]
     [OpenApiOperation(operationId: "DeletePlayer", tags: new[] { "players" }, Summary = "Delete player", Description = "Soft delete a player (Admin only)")]
@@ -395,17 +405,16 @@ public class PlayerEndpoints
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.NoContent, contentType: "application/json", bodyType: typeof(void), Description = "Player deleted")]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.NotFound, contentType: "application/json", bodyType: typeof(object), Description = "Player not found")]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.Unauthorized, contentType: "application/json", bodyType: typeof(object), Description = "Admin access required")]
-    public async Task<IActionResult> DeletePlayer(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "players/{id}")] HttpRequest req,
+    public async Task<HttpResponseData> DeletePlayer(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "players/{id}")] HttpRequestData req,
         Guid id)
     {
         try
         {
-            var (userId, roles) = await AuthorizeRequest(req);
-            if (userId == null || !HasAnyRole(roles, "Administrator"))
-            {
-                return new UnauthorizedObjectResult(new { error = "Admin access required" });
-            }
+            // Validate token and authorize (Administrator only)
+            var authResult = await _authService.ValidateAndAuthorizeAsync(req, "Administrator");
+            if (!authResult.IsAuthorized)
+                return authResult.ErrorResponse!;
 
             await using var conn = await _dbService.GetConnectionAsync();
 
@@ -422,21 +431,22 @@ public class PlayerEndpoints
 
             if (result == null)
             {
-                return new NotFoundObjectResult(new { error = "Player not found" });
+                return await req.NotFoundAsync("Player not found");
             }
 
-            return new NoContentResult();
+            return req.CreateResponse(HttpStatusCode.NoContent);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error deleting player");
-            return new StatusCodeResult(StatusCodes.Status500InternalServerError);
+            return await req.InternalServerErrorAsync("Error deleting player");
         }
     }
 
     /// <summary>
-    /// GET /api/player/quizzes?playerId={guid}
-    /// Get all quizzes for a specific player (or current player if not specified)
+    /// Get all quizzes for a specific player
+    /// GET /api/player/quizzes
+    /// Requires: Player or Administrator role
     /// </summary>
     [Function("GetPlayerQuizzes")]
     [OpenApiOperation(operationId: "GetPlayerQuizzes", tags: new[] { "players" }, Summary = "Get player's quizzes", Description = "Get all quizzes for a player")]
@@ -444,18 +454,18 @@ public class PlayerEndpoints
     [OpenApiParameter(name: "playerId", In = ParameterLocation.Query, Required = false, Type = typeof(Guid), Description = "Player ID (defaults to current user's player)")]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json", bodyType: typeof(List<object>), Description = "List of quizzes")]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.Unauthorized, contentType: "application/json", bodyType: typeof(object), Description = "Authentication required")]
-    public async Task<IActionResult> GetPlayerQuizzes(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "player/quizzes")] HttpRequest req)
+    public async Task<HttpResponseData> GetPlayerQuizzes(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "player/quizzes")] HttpRequestData req)
     {
         try
         {
-            var (userId, roles) = await AuthorizeRequest(req);
-            if (userId == null || !HasAnyRole(roles, "Player", "Administrator"))
-            {
-                return new UnauthorizedObjectResult(new { error = "Player or Admin access required" });
-            }
+            // Validate token and authorize
+            var authResult = await _authService.ValidateAndAuthorizeAsync(req, "Player", "Administrator");
+            if (!authResult.IsAuthorized)
+                return authResult.ErrorResponse!;
 
-            var playerIdParam = req.Query["playerId"].FirstOrDefault();
+            var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
+            var playerIdParam = query["playerId"];
             Guid? playerId = null;
             if (!string.IsNullOrEmpty(playerIdParam) && Guid.TryParse(playerIdParam, out var parsedPlayerId))
             {
@@ -477,12 +487,12 @@ public class PlayerEndpoints
                 var playerUserId = await checkCmd.ExecuteScalarAsync();
                 if (playerUserId == null)
                 {
-                    return new NotFoundObjectResult(new { error = "Player not found" });
+                    return await req.NotFoundAsync("Player not found");
                 }
                 
-                if (!playerUserId.Equals(userId.Value))
+                if (!playerUserId.Equals(authResult.UserId!))
                 {
-                    return new UnauthorizedObjectResult(new { error = "Access denied" });
+                    return await req.UnauthorizedAsync("Access denied");
                 }
             }
 
@@ -505,7 +515,7 @@ public class PlayerEndpoints
                 ORDER BY q.created_at DESC";
 
             await using var cmd = new NpgsqlCommand(sql, conn);
-            cmd.Parameters.AddWithValue("userId", userId.Value);
+            cmd.Parameters.AddWithValue("userId", authResult.UserId!);
 
             var quizzes = new List<object>();
             await using var reader = await cmd.ExecuteReaderAsync();
@@ -526,34 +536,12 @@ public class PlayerEndpoints
                 });
             }
 
-            return new OkObjectResult(quizzes);
+            return await req.OkAsync(quizzes);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting player quizzes");
-            return new StatusCodeResult(StatusCodes.Status500InternalServerError);
+            return await req.InternalServerErrorAsync("Error getting player quizzes");
         }
-    }
-
-    private async Task<(Guid? userId, List<string> roles)> AuthorizeRequest(HttpRequest req)
-    {
-        var authHeader = req.Headers["Authorization"].FirstOrDefault();
-        if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
-        {
-            return (null, new List<string>());
-        }
-
-        var token = authHeader.Substring("Bearer ".Length).Trim();
-        var (userId, roles) = _tokenService.ValidateTokenWithRoles(token);
-        
-        return (userId, roles ?? new List<string>());
-    }
-
-    private bool HasAnyRole(List<string> userRoles, params string[] requiredRoles)
-    {
-        return requiredRoles.Any(required => 
-            userRoles.Any(userRole => userRole.Equals(required, StringComparison.OrdinalIgnoreCase)));
     }
 }
-
-
