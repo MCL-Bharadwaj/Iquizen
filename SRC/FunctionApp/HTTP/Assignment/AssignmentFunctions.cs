@@ -378,6 +378,7 @@ public class AssignmentFunctions
                     qa.completed_at,
                     qa.score,
                     qa.max_attempts,
+                    qa.attempts_used,
                     qa.is_mandatory,
                     qa.notes
                 FROM quiz.quiz_assignments qa
@@ -497,6 +498,7 @@ public class AssignmentFunctions
             var completedAtOrdinal = reader.GetOrdinal("completed_at");
             var scoreOrdinal = reader.GetOrdinal("score");
             var maxAttemptsOrdinal = reader.GetOrdinal("max_attempts");
+            var attemptsUsedOrdinal = reader.GetOrdinal("attempts_used");
             var isMandatoryOrdinal = reader.GetOrdinal("is_mandatory");
             var notesOrdinal = reader.GetOrdinal("notes");
 
@@ -525,7 +527,7 @@ public class AssignmentFunctions
                     CompletedAt = reader.IsDBNull(completedAtOrdinal) ? null : reader.GetDateTime(completedAtOrdinal),
                     Score = reader.IsDBNull(scoreOrdinal) ? null : reader.GetDecimal(scoreOrdinal),
                     MaxAttempts = reader.IsDBNull(maxAttemptsOrdinal) ? null : reader.GetInt32(maxAttemptsOrdinal),
-                    AttemptsUsed = 0, // This would need to be calculated from attempts table if needed
+                    AttemptsUsed = reader.GetInt32(attemptsUsedOrdinal),
                     IsMandatory = reader.GetBoolean(isMandatoryOrdinal),
                     Notes = reader.IsDBNull(notesOrdinal) ? null : reader.GetString(notesOrdinal),
                     CreatedAt = reader.GetDateTime(assignedAtOrdinal), // Using assigned_at as created_at
@@ -581,7 +583,8 @@ public class AssignmentFunctions
                     q.subject, q.difficulty, q.estimated_minutes
                 FROM quiz.quiz_assignments qa
                 LEFT JOIN quiz.quizzes q ON qa.quiz_id = q.quiz_id
-                WHERE qa.user_id = @UserId::uuid";
+                WHERE qa.user_id = @UserId::uuid
+                AND qa.status != 'cancelled'";
             
             if (!string.IsNullOrEmpty(status))
                 sql += " AND qa.status = @Status";
@@ -994,7 +997,7 @@ public class AssignmentFunctions
 
             var sql = @"
                 UPDATE quiz.quiz_assignments 
-                SET status = 'cancelled'
+                SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
                 WHERE assignment_id = @AssignmentId
                 RETURNING assignment_id";
 

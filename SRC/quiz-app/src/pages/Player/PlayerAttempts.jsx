@@ -264,7 +264,7 @@ const PlayerAttempts = ({ isDark }) => {
               <div className="flex gap-3 pt-4">
                 {attempt.status === 'in_progress' ? (
                   <button
-                    onClick={() => navigate(`/Player/quiz/${attempt.quizId}`)}
+                    onClick={() => navigate(`/Player/quiz/${attempt.quizId}/attempt/${attempt.attemptId}`)}
                     className="px-6 py-2 bg-gradient-to-r from-blue-500 to-cyan-600 text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center gap-2"
                   >
                     <PlayCircle className="w-4 h-4" />

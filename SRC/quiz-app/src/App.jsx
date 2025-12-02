@@ -81,6 +81,7 @@ function App() {
                     <Route path="/dashboard" element={<PlayerDashboard isDark={isDark} />} />
                     <Route path="/quizzes" element={<PlayerQuizzes isDark={isDark} />} />
                     <Route path="/quiz/:quizId" element={<TakeQuiz isDark={isDark} />} />
+                    <Route path="/quiz/:quizId/attempt/:attemptId" element={<TakeQuiz isDark={isDark} />} />
                     <Route path="/attempts" element={<PlayerAttempts isDark={isDark} />} />
                     <Route path="/attempt/:attemptId" element={<AttemptDetails isDark={isDark} />} />
                   </Routes>

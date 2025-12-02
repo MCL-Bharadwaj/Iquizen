@@ -577,13 +577,18 @@ export const helpers = {
     const completed = attempts.filter(a => a.status === 'completed');
     const inProgress = attempts.filter(a => a.status === 'in_progress');
     
+    // Count unique quizzes that have been completed (not total attempts)
+    const uniqueCompletedQuizzes = new Set(
+      completed.map(a => a.quizId)
+    ).size;
+    
     const avgScore = completed.length > 0
       ? completed.reduce((sum, a) => sum + (a.scorePercentage || 0), 0) / completed.length
       : 0;
 
     return {
       total: attempts.length,
-      completed: completed.length,
+      completed: uniqueCompletedQuizzes, // Changed: now counts unique quizzes, not attempts
       inProgress: inProgress.length,
       averageScore: Math.round(avgScore),
     };

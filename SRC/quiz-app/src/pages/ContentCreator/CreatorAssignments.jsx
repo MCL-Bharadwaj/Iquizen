@@ -98,7 +98,7 @@ const CreatorAssignments = ({ isDark }) => {
     try {
       const response = await playerApi.getAllPlayers(1, 100); // Get all players for assignment
       console.log('Players API response:', response);
-      // Handle direct array response or paginated response
+      // Handle direct array response or data property
       if (Array.isArray(response)) {
         setPlayers(response);
       } else {
@@ -110,17 +110,17 @@ const CreatorAssignments = ({ isDark }) => {
   };
 
   const handleDeleteAssignment = async (assignmentId) => {
-    if (!window.confirm('Are you sure you want to delete this assignment?')) {
+    if (!window.confirm('Are you sure you want to cancel this assignment? The assignment will be marked as "cancelled" and will be hidden from the player\'s dashboard, but you will still be able to see it here.')) {
       return;
     }
 
     try {
       await assignmentApi.deleteAssignment(assignmentId);
-      toast.success('Assignment deleted successfully');
+      toast.success('Assignment cancelled successfully');
       fetchAssignments();
     } catch (error) {
-      console.error('Error deleting assignment:', error);
-      toast.error('Failed to delete assignment');
+      console.error('Error cancelling assignment:', error);
+      toast.error('Failed to cancel assignment');
     }
   };
 

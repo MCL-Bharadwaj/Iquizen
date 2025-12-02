@@ -33,7 +33,7 @@ namespace Quizz.Functions.Endpoints.Attempt
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _authService = authService ?? throw new ArgumentNullException(nameof(authService));
         }
-///HI
+
         [Function("StartAttempt")]
         [OpenApiOperation(
             operationId: "StartAttempt",
@@ -79,6 +79,45 @@ namespace Quizz.Functions.Endpoints.Attempt
                 {
                     return await ResponseHelper.BadRequestAsync(req, "UserId and QuizId are required");
                 }
+
+                // Check for existing in-progress attempt first
+                var checkExistingAttemptSql = @"
+                    SELECT attempt_id, started_at
+                    FROM quiz.attempts
+                    WHERE user_id = @user_id AND quiz_id = @quiz_id AND status = 'in_progress'
+                    ORDER BY started_at DESC
+                    LIMIT 1";
+
+                using var existingAttemptReader = await _dbService.ExecuteQueryAsync(checkExistingAttemptSql,
+                    new NpgsqlParameter("user_id", NpgsqlTypes.NpgsqlDbType.Uuid) { Value = Guid.Parse(request.UserId) },
+                    new NpgsqlParameter("quiz_id", request.QuizId));
+
+                if (await existingAttemptReader.ReadAsync())
+                {
+                    // Return existing in-progress attempt instead of creating a new one
+                    var existingAttemptId = existingAttemptReader.GetGuid(0);
+                    var existingStartedAt = existingAttemptReader.GetDateTime(1);
+                    await existingAttemptReader.DisposeAsync();
+
+                    _logger.LogInformation($"Found existing in-progress attempt {existingAttemptId} for user {request.UserId}, quiz {request.QuizId}");
+                    
+                    var existingAttempt = new Quizz.DataModel.Dtos.Attempt
+                    {
+                        AttemptId = existingAttemptId,
+                        QuizId = request.QuizId,
+                        UserId = request.UserId,
+                        Status = "in_progress",
+                        StartedAt = existingStartedAt,
+                        CompletedAt = null,
+                        TotalScore = null,
+                        MaxPossibleScore = null,
+                        ScorePercentage = null,
+                        Metadata = null
+                    };
+                    
+                    return await ResponseHelper.OkAsync(req, existingAttempt);
+                }
+                await existingAttemptReader.DisposeAsync();
 
                 // Check if there's an assignment for this user and quiz, and enforce max_attempts
                 var checkAssignmentSql = @"
@@ -465,6 +504,21 @@ namespace Quizz.Functions.Endpoints.Attempt
                     ScorePercentage = reader.IsDBNull(8) ? null : reader.GetDecimal(8),
                     Metadata = metadataResult != null ? JsonSerializer.Deserialize<object>(metadataResult) : null
                 };
+
+                await reader.DisposeAsync();
+
+                // Update assignment status to completed and store score if assignment exists
+                var updateAssignmentSql = @"
+                    UPDATE quiz.quiz_assignments
+                    SET status = 'completed',
+                        completed_at = CURRENT_TIMESTAMP,
+                        score = @score_percentage
+                    WHERE user_id = @user_id AND quiz_id = @quiz_id AND status != 'completed'";
+
+                await _dbService.ExecuteNonQueryAsync(updateAssignmentSql,
+                    new NpgsqlParameter("user_id", NpgsqlTypes.NpgsqlDbType.Uuid) { Value = Guid.Parse(attempt.UserId) },
+                    new NpgsqlParameter("quiz_id", NpgsqlTypes.NpgsqlDbType.Uuid) { Value = attempt.QuizId },
+                    new NpgsqlParameter("score_percentage", scorePercentage));
 
                 _logger.LogInformation($"Completed attempt {attemptId} in {stopwatch.ElapsedMilliseconds}ms");
                 return await ResponseHelper.OkAsync(req, attempt);

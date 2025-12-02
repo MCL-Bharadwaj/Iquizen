@@ -18,7 +18,7 @@ const shuffleArray = (array) => {
 };
 
 const TakeQuiz = ({ isDark }) => {
-  const { quizId } = useParams();
+  const { quizId, attemptId: urlAttemptId } = useParams();
   const navigate = useNavigate();
   const userId = helpers.getUserId('Player');
 
@@ -53,21 +53,28 @@ const TakeQuiz = ({ isDark }) => {
       const questionsData = await quizApi.getQuizQuestions(quizId);
       setQuestions(questionsData.questions || []);
 
-      // Check for existing in-progress attempt (to resume)
-      try {
-        const existingAttempts = await attemptApi.getUserAttempts(userId, 100, 0);
-        const inProgressAttempt = existingAttempts?.data?.find(
-          attempt => attempt.quizId === quizId && attempt.status === 'in_progress'
-        );
+      // Check if attemptId is provided in URL (resuming existing attempt)
+      if (urlAttemptId) {
+        setAttemptId(urlAttemptId);
+        setAttemptCreated(true);
+        console.log('Resuming attempt from URL:', urlAttemptId);
+      } else {
+        // Check for existing in-progress attempt (to resume)
+        try {
+          const existingAttempts = await attemptApi.getUserAttempts(userId, 100, 0);
+          const inProgressAttempt = existingAttempts?.data?.find(
+            attempt => attempt.quizId === quizId && attempt.status === 'in_progress'
+          );
 
-        if (inProgressAttempt) {
-          // Resume existing in-progress attempt
-          setAttemptId(inProgressAttempt.attemptId);
-          setAttemptCreated(true);
-          console.log('Resuming existing attempt:', inProgressAttempt.attemptId);
+          if (inProgressAttempt) {
+            // Resume existing in-progress attempt
+            setAttemptId(inProgressAttempt.attemptId);
+            setAttemptCreated(true);
+            console.log('Resuming existing attempt:', inProgressAttempt.attemptId);
+          }
+        } catch (attemptError) {
+          console.error('Error checking existing attempts:', attemptError);
         }
-      } catch (attemptError) {
-        console.error('Error checking existing attempts:', attemptError);
       }
     } catch (error) {
       console.error('Error loading quiz:', error);

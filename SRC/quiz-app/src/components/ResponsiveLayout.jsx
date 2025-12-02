@@ -3,6 +3,7 @@ import Sidebar from './Sidebar';
 import MobileTopBar from './mobile/MobileTopBar';
 import BottomTabBar from './mobile/BottomTabBar';
 import ProfileMenu from './mobile/ProfileMenu';
+import UserProfileMenu from './UserProfileMenu';
 
 /**
  * ResponsiveLayout - Adaptive navigation wrapper
@@ -31,6 +32,10 @@ const ResponsiveLayout = ({ children, isDark, toggleTheme, role }) => {
       <div className="flex h-screen">
         <Sidebar isDark={isDark} toggleTheme={toggleTheme} role={role} />
         <div className="flex-1 overflow-auto">
+          {/* Top-right profile menu for desktop */}
+          <div className="fixed top-4 right-6 z-50">
+            <UserProfileMenu isDark={isDark} />
+          </div>
           {children}
         </div>
       </div>
