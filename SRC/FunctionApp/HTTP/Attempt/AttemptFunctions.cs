@@ -120,10 +120,13 @@ namespace Quizz.Functions.Endpoints.Attempt
                 await existingAttemptReader.DisposeAsync();
 
                 // Check if there's an assignment for this user and quiz, and enforce max_attempts
+                // Only consider non-cancelled assignments (most recent one)
                 var checkAssignmentSql = @"
                     SELECT assignment_id, max_attempts, attempts_used, status
                     FROM quiz.quiz_assignments
-                    WHERE user_id = @user_id AND quiz_id = @quiz_id";
+                    WHERE user_id = @user_id AND quiz_id = @quiz_id AND status != 'cancelled'
+                    ORDER BY assigned_at DESC
+                    LIMIT 1";
 
                 using var assignmentReader = await _dbService.ExecuteQueryAsync(checkAssignmentSql,
                     new NpgsqlParameter("user_id", NpgsqlTypes.NpgsqlDbType.Uuid) { Value = Guid.Parse(request.UserId) },
@@ -196,6 +199,7 @@ namespace Quizz.Functions.Endpoints.Attempt
                 await reader.DisposeAsync();
 
                 // Update assignment attempts_used counter if assignment exists
+                // Only update non-cancelled assignments (most recent active one)
                 var updateAssignmentSql = @"
                     UPDATE quiz.quiz_assignments
                     SET attempts_used = attempts_used + 1,
@@ -204,7 +208,8 @@ namespace Quizz.Functions.Endpoints.Attempt
                             ELSE status
                         END,
                         started_at = COALESCE(started_at, CURRENT_TIMESTAMP)
-                    WHERE user_id = @user_id AND quiz_id = @quiz_id";
+                    WHERE user_id = @user_id AND quiz_id = @quiz_id AND status != 'cancelled'
+                    AND assignment_id = (SELECT assignment_id FROM quiz.quiz_assignments WHERE user_id = @user_id AND quiz_id = @quiz_id AND status != 'cancelled' ORDER BY assigned_at DESC LIMIT 1)";
 
                 await _dbService.ExecuteNonQueryAsync(updateAssignmentSql,
                     new NpgsqlParameter("user_id", NpgsqlTypes.NpgsqlDbType.Uuid) { Value = Guid.Parse(request.UserId) },
@@ -347,11 +352,12 @@ namespace Quizz.Functions.Endpoints.Attempt
                 }
 
                 var sql = @"
-                    SELECT attempt_id, quiz_id, user_id, status, started_at, completed_at,
-                           total_score, max_possible_score, metadata
-                    FROM quiz.attempts
-                    WHERE user_id = @user_id
-                    ORDER BY started_at DESC";
+                    SELECT a.attempt_id, a.quiz_id, a.user_id, a.status, a.started_at, a.completed_at,
+                           a.total_score, a.max_possible_score, a.metadata, q.title as quiz_title
+                    FROM quiz.attempts a
+                    LEFT JOIN quiz.quizzes q ON a.quiz_id = q.quiz_id
+                    WHERE a.user_id = @user_id
+                    ORDER BY a.started_at DESC";
 
                 _logger.LogInformation($"Executing GetUserAttempts query for userId: {userId}");
 
@@ -364,6 +370,7 @@ namespace Quizz.Functions.Endpoints.Attempt
                 while (await reader.ReadAsync())
                 {
                     var metadataResult = reader.IsDBNull(8) ? null : reader.GetString(8);
+                    var quizTitle = reader.IsDBNull(9) ? "Quiz" : reader.GetString(9);
                     decimal? totalScore = reader.IsDBNull(6) ? (decimal?)null : reader.GetDecimal(6);
                     decimal? maxScore = reader.IsDBNull(7) ? (decimal?)null : reader.GetDecimal(7);
                     decimal? scorePercentage = null;
@@ -383,7 +390,8 @@ namespace Quizz.Functions.Endpoints.Attempt
                         TotalScore = totalScore,
                         MaxPossibleScore = maxScore,
                         ScorePercentage = scorePercentage,
-                        Metadata = metadataResult != null ? JsonSerializer.Deserialize<object>(metadataResult) : null
+                        Metadata = metadataResult != null ? JsonSerializer.Deserialize<object>(metadataResult) : null,
+                        QuizTitle = quizTitle
                     });
                 }
 
@@ -508,12 +516,14 @@ namespace Quizz.Functions.Endpoints.Attempt
                 await reader.DisposeAsync();
 
                 // Update assignment status to completed and store score if assignment exists
+                // Only update non-cancelled assignments (most recent active one)
                 var updateAssignmentSql = @"
                     UPDATE quiz.quiz_assignments
                     SET status = 'completed',
                         completed_at = CURRENT_TIMESTAMP,
                         score = @score_percentage
-                    WHERE user_id = @user_id AND quiz_id = @quiz_id AND status != 'completed'";
+                    WHERE user_id = @user_id AND quiz_id = @quiz_id AND status != 'completed' AND status != 'cancelled'
+                    AND assignment_id = (SELECT assignment_id FROM quiz.quiz_assignments WHERE user_id = @user_id AND quiz_id = @quiz_id AND status != 'cancelled' ORDER BY assigned_at DESC LIMIT 1)";
 
                 await _dbService.ExecuteNonQueryAsync(updateAssignmentSql,
                     new NpgsqlParameter("user_id", NpgsqlTypes.NpgsqlDbType.Uuid) { Value = Guid.Parse(attempt.UserId) },

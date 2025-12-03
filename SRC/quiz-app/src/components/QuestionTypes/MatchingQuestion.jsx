@@ -4,6 +4,7 @@ import { Check } from 'lucide-react';
 const MatchingQuestion = ({ question, answer, onChange, isDark }) => {
   const leftItems = question.content.leftItems || question.content.left_items || [];
   const rightItems = question.content.rightItems || question.content.right_items || [];
+  const prevQuestionIdRef = useRef(null);
   
   // Store pairs as { leftId: rightId }
   const [pairs, setPairs] = useState(() => {
@@ -22,6 +23,26 @@ const MatchingQuestion = ({ question, answer, onChange, isDark }) => {
   const svgRef = useRef(null);
   const leftRefs = useRef({});
   const rightRefs = useRef({});
+
+  // Reset state when question changes
+  useEffect(() => {
+    // Only reset if question actually changed
+    if (prevQuestionIdRef.current !== question.questionId) {
+      prevQuestionIdRef.current = question.questionId;
+      
+      if (answer?.answer?.pairs && Array.isArray(answer.answer.pairs)) {
+        const pairMap = {};
+        answer.answer.pairs.forEach(pair => {
+          pairMap[pair.left] = pair.right;
+        });
+        setPairs(pairMap);
+      } else {
+        setPairs({});
+      }
+      setSelectedLeft(null);
+      setHoveredRight(null);
+    }
+  });
 
   // Update parent when pairs change
   useEffect(() => {

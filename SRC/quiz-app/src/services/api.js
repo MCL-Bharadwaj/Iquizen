@@ -376,6 +376,17 @@ export const responseApi = {
     }
   },
 
+  // Get all responses for an attempt
+  getAttemptResponses: async (attemptId) => {
+    try {
+      const response = await apiClient.get(`/attempts/${attemptId}/responses`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching attempt responses:', error);
+      throw error;
+    }
+  },
+
   // Grade a response (for admins)
   gradeResponse: async (responseId, pointsEarned, isCorrect, gradingDetails = {}) => {
     try {
@@ -454,13 +465,24 @@ export const assignmentApi = {
     }
   },
 
-  // Delete assignment
+  // Cancel assignment (soft delete)
   deleteAssignment: async (assignmentId) => {
     try {
       const response = await apiClient.delete(`/assignments/${assignmentId}`);
       return response.data;
     } catch (error) {
-      console.error('Error deleting assignment:', error);
+      console.error('Error cancelling assignment:', error);
+      throw error;
+    }
+  },
+
+  // Reassign (reactivate) a cancelled assignment
+  reassignAssignment: async (assignmentId) => {
+    try {
+      const response = await apiClient.put(`/assignments/${assignmentId}/reassign`);
+      return response.data;
+    } catch (error) {
+      console.error('Error reassigning assignment:', error);
       throw error;
     }
   },

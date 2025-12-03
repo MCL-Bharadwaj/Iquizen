@@ -1,8 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { GripVertical } from 'lucide-react';
 
 const OrderingQuestion = ({ question, answer, onChange, isDark }) => {
   const orderItems = question.content.items || [];
+  const prevQuestionIdRef = useRef(null);
+  
+  // Shuffle function
+  function shuffleArray(array) {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  }
   
   // Initialize with shuffled items or current answer
   const [items, setItems] = useState(() => {
@@ -20,15 +31,31 @@ const OrderingQuestion = ({ question, answer, onChange, isDark }) => {
   const [draggedItem, setDraggedItem] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
 
-  // Shuffle function
-  function shuffleArray(array) {
-    const shuffled = [...array];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  // Reset state when question changes
+  useEffect(() => {
+    // Only reset if question actually changed
+    if (prevQuestionIdRef.current !== question.questionId) {
+      prevQuestionIdRef.current = question.questionId;
+      
+      if (answer?.answer) {
+        // If there's already an answer, use that order
+        const answerOrder = typeof answer.answer === 'string' 
+          ? JSON.parse(answer.answer).order 
+          : answer.answer.order;
+        const orderedItems = answerOrder.map(id => orderItems.find(item => item.id === id)).filter(Boolean);
+        if (orderedItems.length > 0) {
+          setItems(orderedItems);
+        }
+      } else {
+        // Otherwise, shuffle the items for this new question
+        if (orderItems.length > 0) {
+          setItems(shuffleArray([...orderItems]));
+        }
+      }
+      setDraggedItem(null);
+      setDragOverIndex(null);
     }
-    return shuffled;
-  }
+  });
 
   // Update parent when items change
   useEffect(() => {

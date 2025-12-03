@@ -133,6 +133,7 @@ namespace Quizz.Functions.Endpoints.Response
                     }
                 }
 
+                // Use UPSERT to handle both new responses and updates to existing responses
                 var sql = @"
                     INSERT INTO quiz.responses (
                         response_id, attempt_id, question_id, answer_payload, 
@@ -142,6 +143,14 @@ namespace Quizz.Functions.Endpoints.Response
                         @response_id, @attempt_id, @question_id, @answer_payload::jsonb, 
                         CURRENT_TIMESTAMP, @points_possible, @points_earned, @is_correct, CURRENT_TIMESTAMP
                     )
+                    ON CONFLICT (attempt_id, question_id)
+                    DO UPDATE SET
+                        answer_payload = EXCLUDED.answer_payload,
+                        submitted_at = CURRENT_TIMESTAMP,
+                        points_possible = EXCLUDED.points_possible,
+                        points_earned = EXCLUDED.points_earned,
+                        is_correct = EXCLUDED.is_correct,
+                        graded_at = CURRENT_TIMESTAMP
                     RETURNING response_id, attempt_id, question_id, answer_payload, submitted_at,
                               points_possible, points_earned, is_correct, grading_details, graded_at";
 

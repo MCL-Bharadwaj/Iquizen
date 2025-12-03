@@ -36,6 +36,9 @@ public class Attempt
 
     [JsonPropertyName("metadata")]
     public object? Metadata { get; set; }
+
+    [JsonPropertyName("quizTitle")]
+    public string? QuizTitle { get; set; }
 }
 
 /// <summary>

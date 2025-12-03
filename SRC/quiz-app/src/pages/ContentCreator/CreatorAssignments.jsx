@@ -32,6 +32,7 @@ const CreatorAssignments = ({ isDark }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [quizFilter, setQuizFilter] = useState('all');
+  const [openDropdown, setOpenDropdown] = useState(null); // Track which dropdown is open
   
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -41,6 +42,15 @@ const CreatorAssignments = ({ isDark }) => {
   useEffect(() => {
     fetchData();
   }, [currentPage, statusFilter, quizFilter]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => setOpenDropdown(null);
+    if (openDropdown) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [openDropdown]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -117,10 +127,27 @@ const CreatorAssignments = ({ isDark }) => {
     try {
       await assignmentApi.deleteAssignment(assignmentId);
       toast.success('Assignment cancelled successfully');
+      setOpenDropdown(null);
       fetchAssignments();
     } catch (error) {
       console.error('Error cancelling assignment:', error);
       toast.error('Failed to cancel assignment');
+    }
+  };
+
+  const handleReassignAssignment = async (assignmentId) => {
+    if (!window.confirm('Are you sure you want to reassign this assignment? The assignment status will be changed back to "assigned" and the player will be able to see and attempt the quiz again.')) {
+      return;
+    }
+
+    try {
+      await assignmentApi.reassignAssignment(assignmentId);
+      toast.success('Assignment reassigned successfully');
+      setOpenDropdown(null);
+      fetchAssignments();
+    } catch (error) {
+      console.error('Error reassigning assignment:', error);
+      toast.error('Failed to reassign assignment');
     }
   };
 
@@ -314,11 +341,52 @@ const CreatorAssignments = ({ isDark }) => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        {getStatusIcon(assignment.status)}
-                        <span className={`ml-2 px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(assignment.status)}`}>
-                          {assignment.status.replace('_', ' ').toUpperCase()}
-                        </span>
+                      <div className="relative">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenDropdown(openDropdown === assignment.assignmentId ? null : assignment.assignmentId);
+                          }}
+                          className="flex items-center hover:bg-gray-100 dark:hover:bg-gray-700 px-2 py-1 rounded"
+                        >
+                          {getStatusIcon(assignment.status)}
+                          <span className={`ml-2 px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(assignment.status)}`}>
+                            {assignment.status.replace('_', ' ').toUpperCase()}
+                          </span>
+                          <ChevronDown className="w-4 h-4 ml-1" />
+                        </button>
+                        
+                        {/* Dropdown Menu */}
+                        {openDropdown === assignment.assignmentId && (
+                          <div className={`absolute left-0 mt-1 w-40 rounded-md shadow-lg z-10 ${
+                            isDark ? 'bg-gray-700' : 'bg-white'
+                          } ring-1 ring-black ring-opacity-5`}>
+                            <div className="py-1">
+                              {assignment.status !== 'cancelled' && (
+                                <button
+                                  onClick={() => handleDeleteAssignment(assignment.assignmentId)}
+                                  className={`w-full text-left px-4 py-2 text-sm flex items-center ${
+                                    isDark ? 'hover:bg-gray-600' : 'hover:bg-gray-100'
+                                  }`}
+                                >
+                                  <XCircle className="w-4 h-4 mr-2" />
+                                  Cancel
+                                </button>
+                              )}
+                              {assignment.status === 'cancelled' && (
+                                <button
+                                  onClick={() => handleReassignAssignment(assignment.assignmentId)}
+                                  className={`w-full text-left px-4 py-2 text-sm flex items-center ${
+                                    isDark ? 'hover:bg-gray-600' : 'hover:bg-gray-100'
+                                  }`}
+                                >
+                                  <CheckCircle className="w-4 h-4 mr-2" />
+                                  Reassign
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">

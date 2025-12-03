@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 
 const FillInBlankDragDrop = ({ question, answer, onChange, isDark }) => {
   const { template, blanks, word_bank, allow_reuse } = question.content;
+  const prevQuestionIdRef = useRef(null);
   
   // Initialize selected items for each blank
   const [selectedItems, setSelectedItems] = useState(() => {
@@ -22,6 +23,35 @@ const FillInBlankDragDrop = ({ question, answer, onChange, isDark }) => {
 
   const [draggedItem, setDraggedItem] = useState(null);
   const [hoveredBlank, setHoveredBlank] = useState(null);
+
+  // Reset state when question changes
+  useEffect(() => {
+    // Only reset if question actually changed
+    if (prevQuestionIdRef.current !== question.questionId) {
+      prevQuestionIdRef.current = question.questionId;
+      
+      if (answer?.answer) {
+        const answerData = typeof answer.answer === 'string' 
+          ? JSON.parse(answer.answer) 
+          : answer.answer;
+        
+        const initial = {};
+        if (answerData.blanks && Array.isArray(answerData.blanks)) {
+          answerData.blanks.forEach(b => {
+            const foundWord = word_bank.find(w => w.id === b.selected_id);
+            if (foundWord) {
+              initial[b.position] = foundWord;
+            }
+          });
+        }
+        setSelectedItems(initial);
+      } else {
+        setSelectedItems({});
+      }
+      setDraggedItem(null);
+      setHoveredBlank(null);
+    }
+  });
 
   // Update parent when selection changes
   useEffect(() => {

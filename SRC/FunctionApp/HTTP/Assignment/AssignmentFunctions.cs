@@ -1017,6 +1017,88 @@ public class AssignmentFunctions
     }
 
     /// <summary>
+    /// Reassign (reactivate) a cancelled assignment
+    /// PUT /api/assignments/{assignmentId}/reassign
+    /// Requires: Administrator, Tutors, or Content Creator role
+    /// </summary>
+    [Function("ReassignAssignment")]
+    [OpenApiOperation(operationId: "ReassignAssignment", tags: new[] { "assignments" }, Summary = "Reassign cancelled assignment", Description = "Reactivate a cancelled assignment by setting status back to 'assigned'")]
+    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = "JWT")]
+    [OpenApiParameter(name: "assignmentId", In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = "Assignment ID (GUID)")]
+    [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json", bodyType: typeof(object), Description = "Assignment reassigned successfully")]
+    [OpenApiResponseWithBody(statusCode: HttpStatusCode.NotFound, contentType: "application/json", bodyType: typeof(object), Description = "Assignment not found")]
+    [OpenApiResponseWithBody(statusCode: HttpStatusCode.BadRequest, contentType: "application/json", bodyType: typeof(object), Description = "Assignment is not cancelled")]
+    [OpenApiResponseWithBody(statusCode: HttpStatusCode.Unauthorized, contentType: "application/json", bodyType: typeof(object), Description = "Authentication required")]
+    public async Task<HttpResponseData> ReassignAssignment(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "assignments/{assignmentId}/reassign")]
+        HttpRequestData req,
+        string assignmentId)
+    {
+        _logger.LogInformation("Reassigning assignment {AssignmentId}", assignmentId);
+
+        try
+        {
+            var authResult = await _authService.ValidateAndAuthorizeAsync(
+                req, "Administrator", "Tutors", "Content Creator");
+
+            if (!authResult.IsAuthorized)
+                return authResult.ErrorResponse!;
+
+            if (!Guid.TryParse(assignmentId, out var assignmentGuid))
+                return await req.BadRequestAsync("Invalid assignment ID");
+
+            // First check if assignment exists and is cancelled
+            var checkSql = @"
+                SELECT assignment_id, status
+                FROM quiz.quiz_assignments
+                WHERE assignment_id = @AssignmentId";
+
+            using var checkReader = await _dbService.ExecuteQueryAsync(checkSql, 
+                new NpgsqlParameter("@AssignmentId", assignmentGuid));
+
+            if (!await checkReader.ReadAsync())
+            {
+                await checkReader.DisposeAsync();
+                return await req.NotFoundAsync("Assignment not found");
+            }
+
+            var currentStatus = checkReader.GetString(checkReader.GetOrdinal("status"));
+            await checkReader.DisposeAsync();
+
+            if (currentStatus != "cancelled")
+                return await req.BadRequestAsync($"Assignment is not cancelled. Current status: {currentStatus}");
+
+            // Reactivate the assignment
+            var sql = @"
+                UPDATE quiz.quiz_assignments 
+                SET status = 'assigned', 
+                    updated_at = CURRENT_TIMESTAMP,
+                    attempts_used = 0
+                WHERE assignment_id = @AssignmentId
+                RETURNING assignment_id";
+
+            using var reader = await _dbService.ExecuteQueryAsync(sql, 
+                new NpgsqlParameter("@AssignmentId", assignmentGuid));
+
+            if (!await reader.ReadAsync())
+            {
+                await reader.DisposeAsync();
+                return await req.NotFoundAsync("Failed to reassign assignment");
+            }
+
+            await reader.DisposeAsync();
+
+            _logger.LogInformation("Assignment {AssignmentId} reassigned", assignmentId);
+            return await req.OkAsync(new { message = "Assignment reassigned successfully" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error reassigning assignment");
+            return await req.ServerErrorAsync($"Error reassigning assignment: {ex.Message}");
+        }
+    }
+
+    /// <summary>
     /// Get assignment statistics for a quiz
     /// GET /api/assignments/stats/{quizId}
     /// Requires: Administrator, Tutors, or Content Creator role
