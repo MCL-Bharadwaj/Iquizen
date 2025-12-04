@@ -290,14 +290,8 @@ const TakeQuiz = ({ isDark }) => {
     const currentQuestion = questions[currentQuestionIndex];
     const answerData = answers[currentQuestion.questionId];
 
-    // If question is unanswered, ask for confirmation to skip
+    // If question is unanswered, submit empty answer (skip without confirmation)
     if (!answerData) {
-      const confirmSkip = window.confirm('You have not answered this question. Do you want to skip it? (This will be recorded as a skipped question with 0 points)');
-      if (!confirmSkip) {
-        return;
-      }
-      
-      // Submit skipped answer
       setSaving(true);
       try {
         await submitSkippedAnswer(currentQuestion.questionId, currentQuestion.points);
@@ -325,36 +319,6 @@ const TakeQuiz = ({ isDark }) => {
       }
     } catch (error) {
       console.error('[handleNext] Error saving answer:', error);
-      // Continue navigation even if save fails
-      if (currentQuestionIndex < questions.length - 1) {
-        setCurrentQuestionIndex(prev => prev + 1);
-      }
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleSkip = async () => {
-    const currentQuestion = questions[currentQuestionIndex];
-    const answerData = answers[currentQuestion.questionId];
-
-    // If already answered, just navigate
-    if (answerData) {
-      if (currentQuestionIndex < questions.length - 1) {
-        setCurrentQuestionIndex(prev => prev + 1);
-      }
-      return;
-    }
-
-    // Skip without confirmation - directly submit empty answer
-    setSaving(true);
-    try {
-      await submitSkippedAnswer(currentQuestion.questionId, currentQuestion.points);
-      if (currentQuestionIndex < questions.length - 1) {
-        setCurrentQuestionIndex(prev => prev + 1);
-      }
-    } catch (error) {
-      console.error('[handleSkip] Error submitting skipped answer:', error);
       // Continue navigation even if save fails
       if (currentQuestionIndex < questions.length - 1) {
         setCurrentQuestionIndex(prev => prev + 1);
@@ -506,7 +470,7 @@ const TakeQuiz = ({ isDark }) => {
           <div className={`text-sm font-medium mb-3 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
             Questions ({answeredQuestions.size} / {questions.length} answered)
           </div>
-          <div className="grid grid-cols-12 gap-2">
+          <div className="flex gap-2 overflow-x-auto pb-2">
             {questions.map((q, index) => {
               const isAnswered = answeredQuestions.has(q.questionId);
               const isCurrent = index === currentQuestionIndex;
@@ -516,7 +480,7 @@ const TakeQuiz = ({ isDark }) => {
                   key={q.questionId}
                   onClick={() => handleQuestionClick(index)}
                   className={`
-                    aspect-square rounded-lg font-semibold text-sm transition-all
+                    flex-shrink-0 w-12 h-12 rounded-lg font-semibold text-sm transition-all
                     ${isCurrent 
                       ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-900' 
                       : ''
@@ -566,63 +530,44 @@ const TakeQuiz = ({ isDark }) => {
 
       {/* Navigation */}
       <div className="flex justify-between items-center">
-        <div className="flex gap-3">
-          <button
-            onClick={handlePrevious}
-            disabled={currentQuestionIndex === 0}
-            className={`px-6 py-3 rounded-xl font-medium transition-all flex items-center gap-2 ${
-              currentQuestionIndex === 0
-                ? 'opacity-50 cursor-not-allowed'
-                : isDark
-                ? 'bg-gray-700 hover:bg-gray-600 text-white'
-                : 'bg-gray-200 hover:bg-gray-300 text-gray-900'
-            }`}
-          >
-            <ChevronLeft className="w-5 h-5" />
-            Previous
-          </button>
-          
-          <button
-            onClick={saveCurrentAnswer}
-            disabled={saving}
-            className={`px-6 py-3 rounded-xl font-medium transition-all flex items-center gap-2 ${
-              saving
-                ? 'opacity-50 cursor-not-allowed'
-                : isDark
-                ? 'bg-purple-700 hover:bg-purple-600 text-white'
-                : 'bg-purple-600 hover:bg-purple-700 text-white'
-            }`}
-          >
-            {saving ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="w-5 h-5" />
-                Save
-              </>
-            )}
-          </button>
-
-          {currentQuestionIndex < questions.length - 1 && (
-            <button
-              onClick={handleSkip}
-              disabled={saving}
-              className={`px-6 py-3 rounded-xl font-medium transition-all flex items-center gap-2 ${
-                saving
-                  ? 'opacity-50 cursor-not-allowed'
-                  : isDark
-                  ? 'bg-yellow-700 hover:bg-yellow-600 text-white'
-                  : 'bg-yellow-500 hover:bg-yellow-600 text-white'
-              }`}
-            >
-              <ChevronRight className="w-5 h-5" />
-              Skip
-            </button>
+        <button
+          onClick={handlePrevious}
+          disabled={currentQuestionIndex === 0}
+          className={`px-6 py-3 rounded-xl font-medium transition-all flex items-center gap-2 ${
+            currentQuestionIndex === 0
+              ? 'opacity-50 cursor-not-allowed'
+              : isDark
+              ? 'bg-gray-700 hover:bg-gray-600 text-white'
+              : 'bg-gray-200 hover:bg-gray-300 text-gray-900'
+          }`}
+        >
+          <ChevronLeft className="w-5 h-5" />
+          Previous
+        </button>
+        
+        <button
+          onClick={saveCurrentAnswer}
+          disabled={saving}
+          className={`px-6 py-3 rounded-xl font-medium transition-all flex items-center gap-2 ${
+            saving
+              ? 'opacity-50 cursor-not-allowed'
+              : isDark
+              ? 'bg-purple-700 hover:bg-purple-600 text-white'
+              : 'bg-purple-600 hover:bg-purple-700 text-white'
+          }`}
+        >
+          {saving ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <Save className="w-5 h-5" />
+              Save
+            </>
           )}
-        </div>
+        </button>
 
         {currentQuestionIndex === questions.length - 1 ? (
           <button

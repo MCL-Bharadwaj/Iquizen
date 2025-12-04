@@ -449,16 +449,13 @@ namespace Quizz.Functions.Endpoints.Attempt
                     return await ResponseHelper.BadRequestAsync(req, "Invalid attempt ID format");
                 }
 
-                // Calculate scores from responses
+                // Calculate total score from responses
                 var scoreSql = @"
-                    SELECT 
-                        COALESCE(SUM(points_earned), 0) as total_score,
-                        COALESCE(SUM(points_possible), 0) as max_score
+                    SELECT COALESCE(SUM(points_earned), 0) as total_score
                     FROM quiz.responses
                     WHERE attempt_id = @attempt_id";
 
                 decimal totalScore = 0;
-                decimal maxScore = 0;
 
                 using (var scoreReader = await _dbService.ExecuteQueryAsync(scoreSql,
                     new NpgsqlParameter("attempt_id", guid)))
@@ -466,7 +463,24 @@ namespace Quizz.Functions.Endpoints.Attempt
                     if (await scoreReader.ReadAsync())
                     {
                         totalScore = scoreReader.GetDecimal(0);
-                        maxScore = scoreReader.GetDecimal(1);
+                    }
+                }
+
+                // Calculate max possible score from actual question points in the quiz
+                var maxScoreSql = @"
+                    SELECT COALESCE(SUM(q.points), 0) as max_score
+                    FROM quiz.questions q
+                    INNER JOIN quiz.attempts a ON q.quiz_id = a.quiz_id
+                    WHERE a.attempt_id = @attempt_id";
+
+                decimal maxScore = 0;
+
+                using (var maxScoreReader = await _dbService.ExecuteQueryAsync(maxScoreSql,
+                    new NpgsqlParameter("attempt_id", guid)))
+                {
+                    if (await maxScoreReader.ReadAsync())
+                    {
+                        maxScore = maxScoreReader.GetDecimal(0);
                     }
                 }
 
