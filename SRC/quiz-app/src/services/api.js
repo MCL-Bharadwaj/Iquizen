@@ -198,6 +198,17 @@ export const quizApi = {
       throw error;
     }
   },
+
+  // Batch import quiz with questions
+  batchImport: async (data) => {
+    try {
+      const response = await apiClient.post('/quizzes/batch', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error batch importing quiz:', error);
+      throw error;
+    }
+  },
 };
 
 // ==================== QUESTION API ====================

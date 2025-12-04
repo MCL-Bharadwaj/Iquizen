@@ -466,14 +466,17 @@ namespace Quizz.Functions.Endpoints.Attempt
                     }
                 }
 
-                // Calculate max possible score from actual question points in the quiz
+                // Calculate max possible score from the questions that were actually answered
+                // Only sum points for questions that have responses in this attempt
                 var maxScoreSql = @"
-                    SELECT COALESCE(SUM(q.points), 0) as max_score
-                    FROM quiz.questions q
-                    INNER JOIN quiz.attempts a ON q.quiz_id = a.quiz_id
-                    WHERE a.attempt_id = @attempt_id";
+                    SELECT COALESCE(SUM(q.points), 0) as max_score,
+                           COUNT(DISTINCT r.question_id) as question_count
+                    FROM quiz.responses r
+                    INNER JOIN quiz.questions q ON r.question_id = q.question_id
+                    WHERE r.attempt_id = @attempt_id";
 
                 decimal maxScore = 0;
+                int questionCount = 0;
 
                 using (var maxScoreReader = await _dbService.ExecuteQueryAsync(maxScoreSql,
                     new NpgsqlParameter("attempt_id", guid)))
@@ -481,6 +484,8 @@ namespace Quizz.Functions.Endpoints.Attempt
                     if (await maxScoreReader.ReadAsync())
                     {
                         maxScore = maxScoreReader.GetDecimal(0);
+                        questionCount = maxScoreReader.GetInt32(1);
+                        _logger.LogInformation($"Max score calculation: {questionCount} answered questions, total {maxScore} points possible");
                     }
                 }
 

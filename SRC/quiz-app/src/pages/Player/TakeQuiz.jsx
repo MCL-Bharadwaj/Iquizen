@@ -35,6 +35,7 @@ const TakeQuiz = ({ isDark }) => {
   const attemptCreationInProgress = useRef(false);
   const [saving, setSaving] = useState(false);
   const [answeredQuestions, setAnsweredQuestions] = useState(new Set());
+  const questionNavRef = useRef(null);
 
   useEffect(() => {
     // Only load quiz data, don't create attempt yet
@@ -42,6 +43,21 @@ const TakeQuiz = ({ isDark }) => {
       loadQuizData();
     }
   }, [quizId]);
+
+  // Auto-scroll to current question in navigation
+  useEffect(() => {
+    if (questionNavRef.current && questions.length > 0) {
+      const container = questionNavRef.current;
+      const buttons = container.getElementsByTagName('button');
+      if (buttons[currentQuestionIndex]) {
+        buttons[currentQuestionIndex].scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+          inline: 'center'
+        });
+      }
+    }
+  }, [currentQuestionIndex, questions.length]);
 
   const loadQuizData = async () => {
     try {
@@ -65,7 +81,7 @@ const TakeQuiz = ({ isDark }) => {
         // Check for existing in-progress attempt (to resume)
         try {
           const existingAttempts = await attemptApi.getUserAttempts(userId, 100, 0);
-          const inProgressAttempt = existingAttempts?.data?.find(
+          const inProgressAttempt = existingAttempts?.attempts?.find(
             attempt => attempt.quizId === quizId && attempt.status === 'in_progress'
           );
 
@@ -151,7 +167,18 @@ const TakeQuiz = ({ isDark }) => {
             answer: response.answerPayload,
             metadata: null
           };
-          answeredSet.add(response.questionId);
+          
+          // Only add to answeredSet if answer is not empty
+          // This prevents skipped questions from showing orange highlight
+          const hasAnswer = response.answerPayload !== null && 
+                           response.answerPayload !== '' && 
+                           response.answerPayload !== undefined &&
+                           !(Array.isArray(response.answerPayload) && response.answerPayload.length === 0) &&
+                           !(typeof response.answerPayload === 'object' && Object.keys(response.answerPayload).length === 0);
+          
+          if (hasAnswer) {
+            answeredSet.add(response.questionId);
+          }
         });
         
         setAnswers(savedAnswers);
@@ -470,47 +497,94 @@ const TakeQuiz = ({ isDark }) => {
           <div className={`text-sm font-medium mb-3 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
             Questions ({answeredQuestions.size} / {questions.length} answered)
           </div>
-          <div className="flex gap-2 overflow-x-auto pb-2">
-            {questions.map((q, index) => {
-              const isAnswered = answeredQuestions.has(q.questionId);
-              const isCurrent = index === currentQuestionIndex;
-              
-              return (
-                <button
-                  key={q.questionId}
-                  onClick={() => handleQuestionClick(index)}
-                  className={`
-                    flex-shrink-0 w-12 h-12 rounded-lg font-semibold text-sm transition-all
-                    ${isCurrent 
-                      ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-900' 
-                      : ''
-                    }
-                    ${isAnswered
-                      ? 'bg-orange-500 text-white hover:bg-orange-600'
-                      : isDark
-                      ? 'bg-gray-800 text-white border-2 border-white hover:bg-gray-700'
-                      : 'bg-white text-gray-900 border-2 border-gray-300 hover:bg-gray-50'
-                    }
-                  `}
-                  title={`Question ${index + 1}${isAnswered ? ' (answered)' : ' (unanswered)'}`}
-                >
-                  {index + 1}
-                </button>
-              );
-            })}
+          <div className="flex items-center gap-2">
+            {/* Left Arrow */}
+            <button
+              onClick={handlePrevious}
+              disabled={currentQuestionIndex === 0}
+              className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-all ${
+                currentQuestionIndex === 0
+                  ? 'opacity-30 cursor-not-allowed'
+                  : isDark
+                  ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                  : 'bg-gray-200 hover:bg-gray-300 text-gray-900'
+              }`}
+              title="Previous question"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+
+            {/* Question Numbers - Scrollable Container */}
+            <div ref={questionNavRef} className="flex-1 overflow-x-auto hide-scrollbar">
+              <div className="flex gap-2 transition-all duration-300">
+                {questions.map((q, index) => {
+                  const isAnswered = answeredQuestions.has(q.questionId);
+                  const isCurrent = index === currentQuestionIndex;
+                  
+                  return (
+                    <button
+                      key={q.questionId}
+                      onClick={() => handleQuestionClick(index)}
+                      className={`
+                        flex-shrink-0 w-12 h-12 rounded-lg font-semibold text-sm transition-all duration-200
+                        ${isCurrent 
+                          ? 'border-2 border-blue-500 shadow-lg' 
+                          : ''
+                        }
+                        ${isAnswered
+                          ? 'bg-orange-500 text-white hover:bg-orange-600'
+                          : isDark
+                          ? 'bg-gray-800 text-white border-2 border-gray-600 hover:bg-gray-700'
+                          : 'bg-white text-gray-900 border-2 border-gray-300 hover:bg-gray-50'
+                        }
+                      `}
+                      title={`Question ${index + 1}${isAnswered ? ' (answered)' : ' (unanswered)'}`}
+                    >
+                      {index + 1}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Right Arrow */}
+            <button
+              onClick={handleNext}
+              disabled={currentQuestionIndex === questions.length - 1}
+              className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-all ${
+                currentQuestionIndex === questions.length - 1
+                  ? 'opacity-30 cursor-not-allowed'
+                  : isDark
+                  ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                  : 'bg-gray-200 hover:bg-gray-300 text-gray-900'
+              }`}
+              title="Next question"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
           </div>
+          
+          <style jsx>{`
+            .hide-scrollbar::-webkit-scrollbar {
+              display: none;
+            }
+            .hide-scrollbar {
+              -ms-overflow-style: none;
+              scrollbar-width: none;
+            }
+          `}</style>
         </div>
       </div>
 
       {/* Question Card */}
       <div className={`rounded-2xl ${isDark ? 'bg-gray-800' : 'bg-white'} p-8 shadow-lg mb-6`}>
-        <div className="mb-6">
-          <div className="flex items-start justify-between mb-4">
+        <div className="mb-4">
+          <div className="flex items-start justify-between mb-2">
             <div className="flex-1">
               <QuestionText 
                 text={currentQuestion.questionText}
                 isDark={isDark}
-                className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}
+                className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}
               />
             </div>
             <span className={`px-3 py-1 rounded-lg text-sm font-medium ${isDark ? 'bg-blue-900 text-blue-300' : 'bg-blue-100 text-blue-700'}`}>
@@ -679,9 +753,6 @@ const QuestionRenderer = ({ question, answer, onChange, isDark }) => {
     case 'fill_in_blank':
       return (
         <div className="space-y-4">
-          <p className={`text-lg ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-            {question.content.template}
-          </p>
           {question.content.blanks.map((blank, index) => (
             <div key={index} className="space-y-2">
               <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>

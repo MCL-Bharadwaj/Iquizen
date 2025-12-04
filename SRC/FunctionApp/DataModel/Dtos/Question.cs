@@ -159,4 +159,67 @@ public class AddQuestionToQuizRequest
     public int? Position { get; set; }
 }
 
+/// <summary>
+/// Batch import request for quiz with questions
+/// </summary>
+public class BatchImportRequest
+{
+    [JsonPropertyName("quiz")]
+    public CreateQuizRequest Quiz { get; set; } = new();
+
+    [JsonPropertyName("questions")]
+    public List<BatchImportQuestion> Questions { get; set; } = new();
+}
+
+/// <summary>
+/// Question for batch import (can have existing questionId or be new)
+/// </summary>
+public class BatchImportQuestion
+{
+    [JsonPropertyName("questionId")]
+    public Guid? QuestionId { get; set; }
+
+    [JsonPropertyName("questionType")]
+    public string QuestionType { get; set; } = string.Empty;
+
+    [JsonPropertyName("questionText")]
+    public string QuestionText { get; set; } = string.Empty;
+
+    [JsonPropertyName("ageMin")]
+    public int? AgeMin { get; set; }
+
+    [JsonPropertyName("ageMax")]
+    public int? AgeMax { get; set; }
+
+    [JsonPropertyName("difficulty")]
+    public string? Difficulty { get; set; }
+
+    [JsonPropertyName("estimatedSeconds")]
+    public int? EstimatedSeconds { get; set; }
+
+    [JsonPropertyName("subject")]
+    public string? Subject { get; set; }
+
+    [JsonPropertyName("locale")]
+    public string? Locale { get; set; }
+
+    [JsonPropertyName("points")]
+    public decimal? Points { get; set; }
+
+    [JsonPropertyName("allowPartialCredit")]
+    public bool? AllowPartialCredit { get; set; }
+
+    [JsonPropertyName("negativeMarking")]
+    public bool? NegativeMarking { get; set; }
+
+    [JsonPropertyName("supportsReadAloud")]
+    public bool? SupportsReadAloud { get; set; }
+
+    [JsonPropertyName("content")]
+    public object Content { get; set; } = new();
+
+    [JsonPropertyName("position")]
+    public int? Position { get; set; }
+}
+
 

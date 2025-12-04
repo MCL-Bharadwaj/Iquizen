@@ -456,6 +456,275 @@ namespace Quizz.Functions.Endpoints.Quiz
                 return await ResponseHelper.InternalServerErrorAsync(req, "Failed to delete quiz");
             }
         }
+
+        [Function("BatchImportQuiz")]
+        [OpenApiOperation(
+            operationId: "BatchImportQuiz",
+            tags: new[] { "Quizzes - Write" },
+            Summary = "Batch import quiz with questions",
+            Description = "Creates a quiz and associates questions (reuses existing questions by ID, creates new ones without ID).")]
+        [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = "JWT")]
+        [OpenApiRequestBody(
+            contentType: "application/json",
+            bodyType: typeof(BatchImportRequest),
+            Required = true,
+            Description = "Batch import request with quiz and questions")]
+        [OpenApiResponseWithBody(
+            statusCode: HttpStatusCode.Created,
+            contentType: "application/json",
+            bodyType: typeof(QuizWithQuestions),
+            Description = "Quiz and questions successfully imported")]
+        [OpenApiResponseWithBody(
+            statusCode: HttpStatusCode.BadRequest,
+            contentType: "application/json",
+            bodyType: typeof(object),
+            Description = "Invalid request data")]
+        [OpenApiResponseWithBody(
+            statusCode: HttpStatusCode.Unauthorized,
+            contentType: "application/json",
+            bodyType: typeof(object),
+            Description = "Unauthorized")]
+        public async Task<HttpResponseData> BatchImportQuiz(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "quizzes/batch")] HttpRequestData req)
+        {
+            var authResult = await _authService.ValidateAndAuthorizeAsync(req, "Tutors", "Content Creator", "Administrator");
+            if (!authResult.IsAuthorized)
+                return authResult.ErrorResponse!;
+
+            var stopwatch = Stopwatch.StartNew();
+
+            try
+            {
+                // Parse request body
+                BatchImportRequest? request;
+                try
+                {
+                    request = await JsonSerializer.DeserializeAsync<BatchImportRequest>(req.Body);
+                }
+                catch (JsonException ex)
+                {
+                    _logger.LogWarning(ex, "Invalid JSON in request body");
+                    return await ResponseHelper.BadRequestAsync(req, "Invalid JSON format");
+                }
+
+                if (request == null || request.Quiz == null || request.Questions == null)
+                {
+                    return await ResponseHelper.BadRequestAsync(req, "Quiz and questions are required");
+                }
+
+                if (string.IsNullOrWhiteSpace(request.Quiz.Title))
+                {
+                    return await ResponseHelper.BadRequestAsync(req, "Quiz title is required");
+                }
+
+                if (request.Questions.Count == 0)
+                {
+                    return await ResponseHelper.BadRequestAsync(req, "At least one question is required");
+                }
+
+                var quizId = Guid.NewGuid();
+                var questionMappings = new List<(Guid questionId, int position)>();
+
+                // Step 1: Create the quiz
+                var createQuizSql = @"
+                    INSERT INTO quiz.quizzes (quiz_id, title, description, age_min, age_max, subject, 
+                                       difficulty, estimated_minutes, tags, created_at, updated_at)
+                    VALUES (@quiz_id, @title, @description, @age_min, @age_max, @subject,
+                           @difficulty, @estimated_minutes, @tags, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    RETURNING quiz_id, title, description, age_min, age_max, subject, 
+                             difficulty, estimated_minutes, tags, created_at, updated_at";
+
+                using (var reader = await _dbService.ExecuteQueryAsync(createQuizSql,
+                    new NpgsqlParameter("quiz_id", quizId),
+                    new NpgsqlParameter("title", request.Quiz.Title),
+                    new NpgsqlParameter("description", (object?)request.Quiz.Description ?? DBNull.Value),
+                    new NpgsqlParameter("age_min", (object?)request.Quiz.AgeMin ?? DBNull.Value),
+                    new NpgsqlParameter("age_max", (object?)request.Quiz.AgeMax ?? DBNull.Value),
+                    new NpgsqlParameter("subject", (object?)request.Quiz.Subject ?? DBNull.Value),
+                    new NpgsqlParameter("difficulty", (object?)request.Quiz.Difficulty ?? DBNull.Value),
+                    new NpgsqlParameter("estimated_minutes", (object?)request.Quiz.EstimatedMinutes ?? DBNull.Value),
+                    new NpgsqlParameter("tags", NpgsqlDbType.Array | NpgsqlDbType.Text)
+                    {
+                        Value = (object?)request.Quiz.Tags ?? DBNull.Value
+                    }))
+                {
+                    if (!await reader.ReadAsync())
+                    {
+                        return await ResponseHelper.InternalServerErrorAsync(req, "Failed to create quiz");
+                    }
+                }
+
+                // Step 2: Process questions
+                int position = 1;
+                foreach (var question in request.Questions)
+                {
+                    Guid questionId;
+
+                    // Check if questionId is provided and exists
+                    if (question.QuestionId.HasValue)
+                    {
+                        bool questionExists = false;
+                        var checkQuestionSql = @"
+                            SELECT question_id FROM quiz.questions 
+                            WHERE question_id = @question_id AND deleted_at IS NULL";
+
+                        using (var checkReader = await _dbService.ExecuteQueryAsync(checkQuestionSql,
+                            new NpgsqlParameter("question_id", question.QuestionId.Value)))
+                        {
+                            questionExists = await checkReader.ReadAsync();
+                        } // Reader is disposed here
+
+                        if (questionExists)
+                        {
+                            // Existing question - reuse it
+                            questionId = question.QuestionId.Value;
+                            _logger.LogInformation($"Reusing existing question {questionId}");
+                        }
+                        else
+                        {
+                            // QuestionId provided but doesn't exist - create new with this ID
+                            questionId = question.QuestionId.Value;
+                            await CreateQuestionAsync(questionId, question);
+                            _logger.LogInformation($"Created new question with provided ID {questionId}");
+                        }
+                    }
+                    else
+                    {
+                        // No questionId - create new question
+                        questionId = Guid.NewGuid();
+                        await CreateQuestionAsync(questionId, question);
+                        _logger.LogInformation($"Created new question {questionId}");
+                    }
+
+                    // Add to mappings list
+                    questionMappings.Add((questionId, question.Position ?? position));
+                    position++;
+                }
+
+                // Step 3: Create quiz-question mappings
+                foreach (var (questionId, pos) in questionMappings)
+                {
+                    var mappingSql = @"
+                        INSERT INTO quiz.quiz_questions (quiz_id, question_id, position)
+                        VALUES (@quiz_id, @question_id, @position)";
+
+                    await _dbService.ExecuteNonQueryAsync(mappingSql,
+                        new NpgsqlParameter("quiz_id", quizId),
+                        new NpgsqlParameter("question_id", questionId),
+                        new NpgsqlParameter("position", pos));
+                }
+
+                // Step 4: Fetch and return the complete quiz with questions
+                var fetchQuizSql = @"
+                    SELECT q.quiz_id, q.title, q.description, q.age_min, q.age_max, q.subject,
+                           q.difficulty, q.estimated_minutes, q.tags, q.created_at, q.updated_at
+                    FROM quiz.quizzes q
+                    WHERE q.quiz_id = @quiz_id AND q.deleted_at IS NULL";
+
+                QuizWithQuestions? result = null;
+                using (var quizReader = await _dbService.ExecuteQueryAsync(fetchQuizSql,
+                    new NpgsqlParameter("quiz_id", quizId)))
+                {
+                    if (await quizReader.ReadAsync())
+                    {
+                        result = new QuizWithQuestions
+                        {
+                            QuizId = quizReader.GetGuid(0),
+                            Title = quizReader.GetString(1),
+                            Description = quizReader.IsDBNull(2) ? null : quizReader.GetString(2),
+                            AgeMin = quizReader.IsDBNull(3) ? null : quizReader.GetInt32(3),
+                            AgeMax = quizReader.IsDBNull(4) ? null : quizReader.GetInt32(4),
+                            Subject = quizReader.IsDBNull(5) ? null : quizReader.GetString(5),
+                            Difficulty = quizReader.IsDBNull(6) ? null : quizReader.GetString(6),
+                            EstimatedMinutes = quizReader.IsDBNull(7) ? null : quizReader.GetInt32(7),
+                            Tags = quizReader.IsDBNull(8) ? null : (string[])quizReader.GetValue(8),
+                            CreatedAt = quizReader.GetDateTime(9),
+                            UpdatedAt = quizReader.GetDateTime(10)
+                        };
+                    }
+                }
+
+                if (result == null)
+                {
+                    return await ResponseHelper.InternalServerErrorAsync(req, "Failed to retrieve created quiz");
+                }
+
+                // Fetch questions
+                var fetchQuestionsSql = @"
+                    SELECT q.question_id, q.question_type, q.question_text, q.difficulty, 
+                           q.points, q.estimated_seconds, qq.position
+                    FROM quiz.questions q
+                    INNER JOIN quiz.quiz_questions qq ON q.question_id = qq.question_id
+                    WHERE qq.quiz_id = @quiz_id AND q.deleted_at IS NULL
+                    ORDER BY qq.position";
+
+                using (var questionsReader = await _dbService.ExecuteQueryAsync(fetchQuestionsSql,
+                    new NpgsqlParameter("quiz_id", quizId)))
+                {
+                    while (await questionsReader.ReadAsync())
+                    {
+                        result.Questions.Add(new QuestionSummary
+                        {
+                            QuestionId = questionsReader.GetGuid(0),
+                            QuestionType = questionsReader.GetString(1),
+                            QuestionText = questionsReader.GetString(2),
+                            Difficulty = questionsReader.IsDBNull(3) ? null : questionsReader.GetString(3),
+                            Points = questionsReader.GetDecimal(4),
+                            EstimatedSeconds = questionsReader.IsDBNull(5) ? null : questionsReader.GetInt32(5),
+                            Position = questionsReader.IsDBNull(6) ? null : questionsReader.GetInt32(6)
+                        });
+                    }
+                }
+
+                _logger.LogInformation($"Batch imported quiz {quizId} with {result.Questions.Count} questions in {stopwatch.ElapsedMilliseconds}ms");
+                return await ResponseHelper.CreatedAsync(req, result, $"/api/quizzes/{quizId}");
+            }
+            catch (Npgsql.PostgresException ex) when (ex.SqlState == "23505")
+            {
+                _logger.LogWarning(ex, "Unique constraint violation in batch import");
+                return await ResponseHelper.BadRequestAsync(req, "Duplicate data detected in batch import");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in batch import");
+                return await ResponseHelper.InternalServerErrorAsync(req, "Failed to import quiz and questions");
+            }
+        }
+
+        private async Task CreateQuestionAsync(Guid questionId, BatchImportQuestion question)
+        {
+            var sql = @"
+                INSERT INTO quiz.questions (
+                    question_id, question_type, question_text, age_min, age_max, difficulty,
+                    estimated_seconds, subject, locale, points, allow_partial_credit,
+                    negative_marking, supports_read_aloud, content, version, created_at, updated_at
+                )
+                VALUES (
+                    @question_id, @question_type, @question_text, @age_min, @age_max, @difficulty,
+                    @estimated_seconds, @subject, @locale, @points, @allow_partial_credit,
+                    @negative_marking, @supports_read_aloud, @content::jsonb, @version, 
+                    CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                )";
+
+            var contentJson = JsonSerializer.Serialize(question.Content);
+
+            await _dbService.ExecuteNonQueryAsync(sql,
+                new NpgsqlParameter("question_id", questionId),
+                new NpgsqlParameter("question_type", question.QuestionType),
+                new NpgsqlParameter("question_text", question.QuestionText),
+                new NpgsqlParameter("age_min", (object?)question.AgeMin ?? DBNull.Value),
+                new NpgsqlParameter("age_max", (object?)question.AgeMax ?? DBNull.Value),
+                new NpgsqlParameter("difficulty", (object?)question.Difficulty ?? DBNull.Value),
+                new NpgsqlParameter("estimated_seconds", (object?)question.EstimatedSeconds ?? DBNull.Value),
+                new NpgsqlParameter("subject", (object?)question.Subject ?? DBNull.Value),
+                new NpgsqlParameter("locale", question.Locale ?? "en-US"),
+                new NpgsqlParameter("points", question.Points ?? 10.0m),
+                new NpgsqlParameter("allow_partial_credit", question.AllowPartialCredit ?? false),
+                new NpgsqlParameter("negative_marking", question.NegativeMarking ?? false),
+                new NpgsqlParameter("supports_read_aloud", question.SupportsReadAloud ?? true),
+                new NpgsqlParameter("content", contentJson),
+                new NpgsqlParameter("version", 1));
+        }
     }
 }
 

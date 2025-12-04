@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { quizApi } from '../../services/api';
-import { ArrowLeft, Save, X } from 'lucide-react';
+import { ArrowLeft, Save, X, Upload, FileJson } from 'lucide-react';
 
 const CreatorCreateQuiz = ({ isDark }) => {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState('manual'); // 'manual' or 'batch'
 
   const [formData, setFormData] = useState({
     title: '',
@@ -20,6 +21,12 @@ const CreatorCreateQuiz = ({ isDark }) => {
   const [tagInput, setTagInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+
+  // Batch import state
+  const [quizJson, setQuizJson] = useState('');
+  const [questionsJson, setQuestionsJson] = useState('');
+  const [batchLoading, setBatchLoading] = useState(false);
+  const [batchErrors, setBatchErrors] = useState({});
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -94,6 +101,50 @@ const CreatorCreateQuiz = ({ isDark }) => {
     navigate('/creator/dashboard');
   };
 
+  const handleBatchImport = async () => {
+    setBatchLoading(true);
+    setBatchErrors({});
+
+    try {
+      // Validate and parse JSON
+      let quizData;
+      let questionsData;
+
+      try {
+        quizData = JSON.parse(quizJson);
+      } catch (e) {
+        setBatchErrors(prev => ({ ...prev, quiz: 'Invalid JSON format for quiz' }));
+        setBatchLoading(false);
+        return;
+      }
+
+      try {
+        questionsData = JSON.parse(questionsJson);
+        if (!Array.isArray(questionsData)) {
+          throw new Error('Questions must be an array');
+        }
+      } catch (e) {
+        setBatchErrors(prev => ({ ...prev, questions: 'Invalid JSON format for questions (must be an array)' }));
+        setBatchLoading(false);
+        return;
+      }
+
+      // Send batch import request
+      const response = await quizApi.batchImport({ quiz: quizData, questions: questionsData });
+
+      if (response.success) {
+        navigate('/creator/quizzes');
+      }
+    } catch (error) {
+      console.error('Batch import error:', error);
+      setBatchErrors({ 
+        general: error.response?.data?.message || 'Failed to import quiz and questions' 
+      });
+    } finally {
+      setBatchLoading(false);
+    }
+  };
+
   return (
     <div className="p-8 max-w-4xl mx-auto">
       {/* Header */}
@@ -120,7 +171,35 @@ const CreatorCreateQuiz = ({ isDark }) => {
         </p>
       </div>
 
-      {/* Form */}
+      {/* Tab Navigation */}
+      <div className={`flex border-b mb-6 ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+        <button
+          type="button"
+          onClick={() => setActiveTab('manual')}
+          className={`px-6 py-3 font-medium text-sm transition-colors ${
+            activeTab === 'manual'
+              ? `border-b-2 border-blue-600 ${isDark ? 'text-blue-400' : 'text-blue-600'}`
+              : isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Manual Entry
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('batch')}
+          className={`px-6 py-3 font-medium text-sm transition-colors flex items-center gap-2 ${
+            activeTab === 'batch'
+              ? `border-b-2 border-blue-600 ${isDark ? 'text-blue-400' : 'text-blue-600'}`
+              : isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          <Upload className="w-4 h-4" />
+          Batch Import
+        </button>
+      </div>
+
+      {/* Manual Entry Form */}
+      {activeTab === 'manual' && (
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className={`
           p-6 rounded-lg space-y-6
@@ -377,6 +456,118 @@ const CreatorCreateQuiz = ({ isDark }) => {
           </button>
         </div>
       </form>
+      )}
+
+      {/* Batch Import Form */}
+      {activeTab === 'batch' && (
+        <div className="space-y-6">
+          <div className={`
+            p-6 rounded-lg space-y-6
+            ${isDark ? 'bg-gray-800' : 'bg-white shadow'}
+          `}>
+            {/* Info Box */}
+            <div className={`
+              p-4 rounded-lg border flex items-start gap-3
+              ${isDark ? 'bg-blue-900/20 border-blue-800 text-blue-300' : 'bg-blue-50 border-blue-200 text-blue-800'}
+            `}>
+              <FileJson className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-medium mb-1">Batch Import Instructions</p>
+                <p>Enter valid JSON for the quiz and questions. Existing questions (by questionId) will be reused, new ones will be created.</p>
+              </div>
+            </div>
+
+            {/* General Error */}
+            {batchErrors.general && (
+              <div className={`
+                p-4 rounded-lg border flex items-start gap-3
+                ${isDark ? 'bg-red-900/20 border-red-800 text-red-300' : 'bg-red-50 border-red-200 text-red-800'}
+              `}>
+                <p className="text-sm">{batchErrors.general}</p>
+              </div>
+            )}
+
+            {/* Quiz JSON */}
+            <div>
+              <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
+                Quiz JSON <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={quizJson}
+                onChange={(e) => setQuizJson(e.target.value)}
+                placeholder={`{\n  "title": "Sample Quiz",\n  "description": "Quiz description",\n  "subject": "Mathematics",\n  "difficulty": "medium",\n  "ageMin": 12,\n  "ageMax": 15,\n  "estimatedMinutes": 10,\n  "tags": ["math", "algebra"]\n}`}
+                rows={8}
+                className={`
+                  w-full px-4 py-2 rounded-lg border transition-colors font-mono text-sm
+                  ${isDark 
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500' 
+                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                  }
+                `}
+              />
+              {batchErrors.quiz && (
+                <p className="mt-1 text-sm text-red-500">{batchErrors.quiz}</p>
+              )}
+            </div>
+
+            {/* Questions JSON Array */}
+            <div>
+              <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
+                Questions JSON Array <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={questionsJson}
+                onChange={(e) => setQuestionsJson(e.target.value)}
+                placeholder={`[\n  {\n    "questionText": "What is 2+2?",\n    "questionType": "multiple_choice_single",\n    "difficulty": "easy",\n    "points": 10,\n    "content": {\n      "options": [\n        { "value": "3", "label": "3" },\n        { "value": "4", "label": "4" }\n      ],\n      "correctAnswer": "4"\n    }\n  }\n]`}
+                rows={12}
+                className={`
+                  w-full px-4 py-2 rounded-lg border transition-colors font-mono text-sm
+                  ${isDark 
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500' 
+                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                  }
+                `}
+              />
+              {batchErrors.questions && (
+                <p className="mt-1 text-sm text-red-500">{batchErrors.questions}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-4 justify-end">
+            <button
+              type="button"
+              onClick={handleCancel}
+              className={`
+                px-6 py-3 rounded-lg font-medium transition-colors
+                ${isDark 
+                  ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' 
+                  : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                }
+              `}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleBatchImport}
+              disabled={batchLoading}
+              className={`
+                flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors
+                ${batchLoading 
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-blue-600 hover:bg-blue-700'
+                }
+                text-white
+              `}
+            >
+              <Upload className="w-5 h-5" />
+              <span>{batchLoading ? 'Importing...' : 'Import Quiz'}</span>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
