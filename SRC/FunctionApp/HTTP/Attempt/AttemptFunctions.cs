@@ -353,9 +353,11 @@ namespace Quizz.Functions.Endpoints.Attempt
 
                 var sql = @"
                     SELECT a.attempt_id, a.quiz_id, a.user_id, a.status, a.started_at, a.completed_at,
-                           a.total_score, a.max_possible_score, a.metadata, q.title as quiz_title
+                           a.total_score, a.max_possible_score, a.metadata, q.title as quiz_title,
+                           qa.max_attempts, qa.attempts_used
                     FROM quiz.attempts a
                     LEFT JOIN quiz.quizzes q ON a.quiz_id = q.quiz_id
+                    LEFT JOIN quiz.quiz_assignments qa ON a.quiz_id = qa.quiz_id AND a.user_id = qa.user_id
                     WHERE a.user_id = @user_id
                     ORDER BY a.started_at DESC";
 
@@ -371,6 +373,8 @@ namespace Quizz.Functions.Endpoints.Attempt
                 {
                     var metadataResult = reader.IsDBNull(8) ? null : reader.GetString(8);
                     var quizTitle = reader.IsDBNull(9) ? "Quiz" : reader.GetString(9);
+                    var maxAttempts = reader.IsDBNull(10) ? (int?)null : reader.GetInt32(10);
+                    var attemptsUsed = reader.IsDBNull(11) ? (int?)null : reader.GetInt32(11);
                     decimal? totalScore = reader.IsDBNull(6) ? (decimal?)null : reader.GetDecimal(6);
                     decimal? maxScore = reader.IsDBNull(7) ? (decimal?)null : reader.GetDecimal(7);
                     decimal? scorePercentage = null;
@@ -391,7 +395,9 @@ namespace Quizz.Functions.Endpoints.Attempt
                         MaxPossibleScore = maxScore,
                         ScorePercentage = scorePercentage,
                         Metadata = metadataResult != null ? JsonSerializer.Deserialize<object>(metadataResult) : null,
-                        QuizTitle = quizTitle
+                        QuizTitle = quizTitle,
+                        MaxAttempts = maxAttempts,
+                        AttemptsUsed = attemptsUsed
                     });
                 }
 

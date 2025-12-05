@@ -272,17 +272,33 @@ const PlayerAttempts = ({ isDark }) => {
                   </button>
                 ) : (
                   <>
-                    <button
-                      onClick={() => navigate(`/Player/quiz/${attempt.quizId}`)}
-                      className={`px-6 py-2 rounded-xl font-medium transition-all flex items-center gap-2 ${
-                        isDark
-                          ? 'bg-gray-700 hover:bg-gray-600 text-white'
-                          : 'bg-gray-100 hover:bg-gray-200 text-gray-900'
-                      }`}
-                    >
-                      <PlayCircle className="w-4 h-4" />
-                      Retake Quiz
-                    </button>
+                    {/* Only show Retake Quiz button if max attempts not reached */}
+                    {(attempt.maxAttempts === null || attempt.maxAttempts === undefined || 
+                      attempt.attemptsUsed === null || attempt.attemptsUsed === undefined ||
+                      attempt.attemptsUsed < attempt.maxAttempts) && (
+                      <button
+                        onClick={() => navigate(`/Player/quiz/${attempt.quizId}`)}
+                        className={`px-6 py-2 rounded-xl font-medium transition-all flex items-center gap-2 ${
+                          isDark
+                            ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                            : 'bg-gray-100 hover:bg-gray-200 text-gray-900'
+                        }`}
+                      >
+                        <PlayCircle className="w-4 h-4" />
+                        Retake Quiz
+                      </button>
+                    )}
+                    {/* Show max attempts message if limit reached */}
+                    {attempt.maxAttempts !== null && attempt.maxAttempts !== undefined &&
+                      attempt.attemptsUsed !== null && attempt.attemptsUsed !== undefined &&
+                      attempt.attemptsUsed >= attempt.maxAttempts && (
+                      <div className={`px-6 py-2 rounded-xl font-medium flex items-center gap-2 ${
+                        isDark ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        <XCircle className="w-4 h-4" />
+                        Max attempts reached ({attempt.attemptsUsed}/{attempt.maxAttempts})
+                      </div>
+                    )}
                     <button
                       onClick={() => navigate(`/Player/attempt/${attempt.attemptId}`)}
                       className={`px-6 py-2 rounded-xl font-medium transition-all flex items-center gap-2 ${

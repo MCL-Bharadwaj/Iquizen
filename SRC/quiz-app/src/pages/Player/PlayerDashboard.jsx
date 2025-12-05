@@ -285,9 +285,14 @@ const PlayerDashboard = ({ isDark }) => {
                   className={`p-4 rounded-xl ${isDark ? 'bg-gray-700' : 'bg-gray-50'}`}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <span className={`font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                      Quiz Attempt
-                    </span>
+                    <div className="flex-1">
+                      <span className={`font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                        {attempt.quizTitle || 'Quiz'}
+                      </span>
+                      <div className={`text-xs mt-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                        {new Date(attempt.startedAt).toLocaleDateString()} at {new Date(attempt.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </div>
                     <span className={`text-xs px-2 py-1 rounded ${
                       attempt.status === 'completed' 
                         ? 'bg-green-500/20 text-green-400'
@@ -297,7 +302,7 @@ const PlayerDashboard = ({ isDark }) => {
                     </span>
                   </div>
                   {attempt.status === 'completed' && attempt.scorePercentage !== null && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 mt-2">
                       <div className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
                         {Math.round(attempt.scorePercentage)}%
                       </div>

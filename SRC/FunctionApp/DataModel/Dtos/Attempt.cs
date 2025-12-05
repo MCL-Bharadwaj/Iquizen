@@ -39,6 +39,12 @@ public class Attempt
 
     [JsonPropertyName("quizTitle")]
     public string? QuizTitle { get; set; }
+
+    [JsonPropertyName("maxAttempts")]
+    public int? MaxAttempts { get; set; }
+
+    [JsonPropertyName("attemptsUsed")]
+    public int? AttemptsUsed { get; set; }
 }
 
 /// <summary>

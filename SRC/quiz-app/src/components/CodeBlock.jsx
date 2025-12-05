@@ -23,6 +23,8 @@ export const QuestionText = ({ text, isDark, className = '' }) => {
   const codeBlockPattern = /```[\s\S]*?```|`[^`]+`/g;
   
   const renderContent = () => {
+    if (!text) return null;
+    
     const parts = [];
     let lastIndex = 0;
     let match;

@@ -1,62 +1,77 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Loader2, CheckCircle, XCircle, ArrowLeft, Clock, Award } from 'lucide-react';
-import { attemptApi, quizApi, helpers } from '../../services/api';
+import { Loader2, ArrowLeft, User, Calendar, Clock, Award, CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { assignmentApi, quizApi, attemptApi } from '../../services/api';
 import { QuestionText } from '../../components/CodeBlock';
 
-const AttemptDetails = ({ isDark }) => {
-  const { attemptId } = useParams();
+const AssignmentResponsesView = ({ isDark }) => {
+  const { assignmentId } = useParams();
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
-  const [attempt, setAttempt] = useState(null);
+  const [assignment, setAssignment] = useState(null);
   const [quiz, setQuiz] = useState(null);
   const [questions, setQuestions] = useState([]);
-  const [responses, setResponses] = useState([]);
-  const [allAttempts, setAllAttempts] = useState([]);
-  const [canRetake, setCanRetake] = useState(true);
+  const [attempts, setAttempts] = useState([]);
+  const [expandedAttempt, setExpandedAttempt] = useState(null);
+  const [attemptResponses, setAttemptResponses] = useState({});
 
   useEffect(() => {
-    fetchAttemptDetails();
-  }, [attemptId]);
+    fetchAssignmentData();
+  }, [assignmentId]);
 
-  const fetchAttemptDetails = async () => {
+  const fetchAssignmentData = async () => {
     try {
       setLoading(true);
 
-      // Fetch attempt details
-      const attemptData = await attemptApi.getAttemptById(attemptId);
-      setAttempt(attemptData);
+      // Fetch assignment details
+      const assignmentData = await assignmentApi.getAssignmentById(assignmentId);
+      setAssignment(assignmentData);
 
       // Fetch quiz details
-      const quizData = await quizApi.getQuizById(attemptData.quizId);
+      const quizData = await quizApi.getQuizById(assignmentData.quizId);
       setQuiz(quizData);
 
       // Fetch questions
-      const questionsData = await quizApi.getQuizQuestions(attemptData.quizId);
+      const questionsData = await quizApi.getQuizQuestions(assignmentData.quizId);
       setQuestions(questionsData.questions || []);
 
-      // Fetch responses
-      const responsesData = await attemptApi.getAttemptResponses(attemptId);
-      setResponses(responsesData.data || responsesData.responses || []);
-
-      // Fetch all user attempts to check if retake is allowed
-      const userAttemptsData = await attemptApi.getUserAttempts();
-      const attemptsForThisQuiz = (userAttemptsData.attempts || []).filter(
-        a => a.quizId === attemptData.quizId && a.status === 'completed'
-      );
-      setAllAttempts(attemptsForThisQuiz);
-
-      // Check if user can retake (based on quiz maxAttempts setting)
-      const maxAttempts = quizData.maxAttempts || Infinity;
-      const completedAttempts = attemptsForThisQuiz.length;
-      setCanRetake(completedAttempts < maxAttempts);
+      // Fetch all attempts by this user for this quiz
+      const attemptsData = await attemptApi.getUserAttempts(assignmentData.userId);
+      
+      // Filter attempts for this specific quiz and sort by date (newest first)
+      const quizAttempts = (attemptsData.attempts || [])
+        .filter(a => a.quizId === assignmentData.quizId)
+        .sort((a, b) => new Date(a.startedAt) - new Date(b.startedAt)); // Oldest first for Attempt 1, 2, 3...
+      
+      setAttempts(quizAttempts);
     } catch (error) {
-      console.error('Error fetching attempt details:', error);
-      alert('Failed to load attempt details. Please try again.');
-      navigate('/Player/attempts');
+      console.error('Error fetching assignment data:', error);
+      alert('Failed to load assignment responses. Please try again.');
+      navigate('/creator/assignments');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const toggleAttempt = async (attemptId) => {
+    if (expandedAttempt === attemptId) {
+      setExpandedAttempt(null);
+    } else {
+      setExpandedAttempt(attemptId);
+      
+      // Fetch responses if not already loaded
+      if (!attemptResponses[attemptId]) {
+        try {
+          const responsesData = await attemptApi.getAttemptResponses(attemptId);
+          setAttemptResponses(prev => ({
+            ...prev,
+            [attemptId]: responsesData.data || responsesData.responses || []
+          }));
+        } catch (error) {
+          console.error('Error fetching attempt responses:', error);
+        }
+      }
     }
   };
 
@@ -72,48 +87,35 @@ const AttemptDetails = ({ isDark }) => {
     });
   };
 
-  const calculateDuration = (startDate, endDate) => {
+  const formatDuration = (startDate, endDate) => {
     if (!startDate || !endDate) return 'N/A';
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const minutes = Math.round((end - start) / 60000);
-    return `${minutes} min`;
-  };
-
-  const getScoreColor = (percentage) => {
-    if (percentage >= 80) return 'text-green-600 dark:text-green-400';
-    if (percentage >= 60) return 'text-blue-600 dark:text-blue-400';
-    if (percentage >= 40) return 'text-yellow-600 dark:text-yellow-400';
-    return 'text-red-600 dark:text-red-400';
+    const diff = new Date(endDate) - new Date(startDate);
+    const minutes = Math.floor(diff / 60000);
+    const seconds = Math.floor((diff % 60000) / 1000);
+    return `${minutes}m ${seconds}s`;
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className={`min-h-screen flex items-center justify-center ${isDark ? 'bg-gray-900' : 'bg-gray-50'}`}>
         <div className="text-center">
-          <Loader2 className={`w-12 h-12 animate-spin mx-auto mb-4 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
-          <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Loading attempt details...</p>
+          <Loader2 className={`w-12 h-12 mx-auto mb-4 animate-spin ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
+          <p className={`text-lg ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Loading assignment details...</p>
         </div>
       </div>
     );
   }
 
-  if (!attempt || !quiz) {
+  if (!assignment || !quiz) {
     return (
-      <div className="p-8 max-w-4xl mx-auto">
-        <div className={`rounded-2xl ${isDark ? 'bg-red-950 border-red-900' : 'bg-red-50 border-red-200'} border-2 p-8`}>
-          <XCircle className="w-12 h-12 text-red-500 mb-4" />
-          <h2 className={`text-2xl font-bold mb-2 ${isDark ? 'text-red-400' : 'text-red-600'}`}>
-            Attempt Not Found
-          </h2>
-          <p className={`mb-4 ${isDark ? 'text-red-300' : 'text-red-700'}`}>
-            The attempt you're looking for doesn't exist or has been deleted.
-          </p>
+      <div className={`min-h-screen flex items-center justify-center ${isDark ? 'bg-gray-900' : 'bg-gray-50'}`}>
+        <div className="text-center">
+          <p className={`text-lg ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Assignment not found</p>
           <button
-            onClick={() => navigate('/Player/attempts')}
-            className="px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:shadow-lg transition-all"
+            onClick={() => navigate('/creator/assignments')}
+            className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
-            Back to Attempts
+            Back to Assignments
           </button>
         </div>
       </div>
@@ -121,124 +123,190 @@ const AttemptDetails = ({ isDark }) => {
   }
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
-      {/* Back Button */}
-      <button
-        onClick={() => navigate('/Player/attempts')}
-        className={`mb-6 px-4 py-2 rounded-xl font-medium transition-all flex items-center gap-2 ${
-          isDark
-            ? 'bg-gray-800 hover:bg-gray-700 text-white'
-            : 'bg-white hover:bg-gray-50 text-gray-900'
-        } shadow-md`}
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Back to Attempts
-      </button>
+    <div className={`min-h-screen ${isDark ? 'bg-gray-900' : 'bg-gray-50'} pb-10`}>
+      {/* Header */}
+      <div className={`sticky top-0 z-10 ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b shadow-sm`}>
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => navigate('/creator/assignments')}
+                className={`p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+                  isDark ? 'text-gray-300' : 'text-gray-700'
+                }`}
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <div>
+                <h1 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                  Player Response Details
+                </h1>
+                <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                  {quiz.title}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-      {/* Header Card */}
-      <div className={`rounded-2xl ${isDark ? 'bg-gray-800' : 'bg-white'} p-8 shadow-lg mb-6`}>
-        <div className="flex items-start justify-between mb-6">
-          <div>
-            <h1 className={`text-3xl font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-              {quiz.title}
-            </h1>
+      {/* Content */}
+      <div className="max-w-5xl mx-auto px-6 py-8">
+        {/* Assignment Info Card */}
+        <div className={`rounded-xl shadow-lg p-6 mb-8 ${isDark ? 'bg-gray-800' : 'bg-white'}`}>
+          <h2 className={`text-xl font-semibold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+            Assignment Information
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex items-center gap-3">
+              <User className={`w-5 h-5 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
+              <div>
+                <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Player</p>
+                <p className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                  {assignment.userFirstName} {assignment.userLastName}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Calendar className={`w-5 h-5 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
+              <div>
+                <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Assigned Date</p>
+                <p className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                  {formatDate(assignment.assignedAt)}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Award className={`w-5 h-5 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
+              <div>
+                <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Status</p>
+                <p className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                  {assignment.status}
+                </p>
+              </div>
+            </div>
+            {assignment.dueDate && (
+              <div className="flex items-center gap-3">
+                <Clock className={`w-5 h-5 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
+                <div>
+                  <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Due Date</p>
+                  <p className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                    {formatDate(assignment.dueDate)}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Attempts List */}
+        {attempts.length === 0 ? (
+          <div className={`rounded-xl shadow-lg p-8 text-center ${isDark ? 'bg-gray-800' : 'bg-white'}`}>
             <p className={`text-lg ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              {quiz.description}
+              No attempts have been made yet for this assignment.
             </p>
           </div>
-          <div className="text-right">
-            <div className={`text-5xl font-bold mb-2 ${getScoreColor(attempt.scorePercentage || 0)}`}>
-              {attempt.scorePercentage ? Math.round(attempt.scorePercentage) : 0}%
-            </div>
-            <div className={`text-lg ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              {attempt.totalScore || 0} / {attempt.maxPossibleScore || 0} points
-            </div>
-          </div>
-        </div>
-
-        <div className={`grid grid-cols-1 md:grid-cols-3 gap-4 pt-6 border-t ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
-          <div className="flex items-center gap-3">
-            <Clock className={`w-5 h-5 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
-            <div>
-              <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Started</p>
-              <p className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                {formatDate(attempt.startedAt)}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <CheckCircle className={`w-5 h-5 ${isDark ? 'text-green-400' : 'text-green-600'}`} />
-            <div>
-              <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Completed</p>
-              <p className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                {formatDate(attempt.completedAt)}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Award className={`w-5 h-5 ${isDark ? 'text-yellow-400' : 'text-yellow-600'}`} />
-            <div>
-              <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Duration</p>
-              <p className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                {calculateDuration(attempt.startedAt, attempt.completedAt)}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Questions and Answers */}
-      <div className="space-y-6">
-        <h2 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-          Questions & Answers
-        </h2>
-
-        {questions.map((question, index) => {
-          const response = responses.find(r => r.questionId === question.questionId);
-          return (
-            <QuestionReviewCard
-              key={question.questionId}
-              question={question}
-              response={response}
-              index={index}
-              isDark={isDark}
-            />
-          );
-        })}
-      </div>
-
-      {/* Actions */}
-      <div className="mt-8 flex gap-4 justify-center">
-        {canRetake ? (
-          <button
-            onClick={() => navigate(`/Player/quiz/${quiz.quizId}`)}
-            className="px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-600 text-white rounded-xl font-medium hover:shadow-lg transition-all"
-          >
-            Retake Quiz
-          </button>
         ) : (
-          <div className="text-center">
-            <button
-              disabled
-              className="px-6 py-3 bg-gray-400 text-gray-200 rounded-xl font-medium cursor-not-allowed opacity-60"
-            >
-              Retake Quiz
-            </button>
-            <p className={`text-sm mt-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              Maximum attempts reached ({allAttempts.length}/{quiz.maxAttempts || '∞'})
-            </p>
+          <div className="space-y-4">
+            <h2 className={`text-xl font-semibold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+              Player Attempts ({attempts.length})
+            </h2>
+            {attempts.map((attempt, index) => (
+              <div key={attempt.attemptId} className={`rounded-xl shadow-lg overflow-hidden ${isDark ? 'bg-gray-800' : 'bg-white'}`}>
+                {/* Attempt Header - Collapsible */}
+                <button
+                  onClick={() => toggleAttempt(attempt.attemptId)}
+                  className={`w-full p-6 flex items-center justify-between hover:bg-opacity-80 transition-colors ${
+                    isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg ${
+                      isDark ? 'bg-blue-900 text-blue-300' : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      {index + 1}
+                    </div>
+                    <div className="text-left">
+                      <h3 className={`font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                        Attempt {index + 1}
+                      </h3>
+                      <div className="flex items-center gap-4 mt-1">
+                        <span className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                          {formatDate(attempt.startedAt)}
+                        </span>
+                        {attempt.score !== null && attempt.score !== undefined && (
+                          <span className={`text-sm font-semibold ${
+                            attempt.score >= 70 ? 'text-green-500' : attempt.score >= 50 ? 'text-yellow-500' : 'text-red-500'
+                          }`}>
+                            Score: {attempt.score.toFixed(1)}%
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  {expandedAttempt === attempt.attemptId ? (
+                    <ChevronUp className={`w-6 h-6 ${isDark ? 'text-gray-400' : 'text-gray-600'}`} />
+                  ) : (
+                    <ChevronDown className={`w-6 h-6 ${isDark ? 'text-gray-400' : 'text-gray-600'}`} />
+                  )}
+                </button>
+
+                {/* Attempt Details - Expandable */}
+                {expandedAttempt === attempt.attemptId && (
+                  <div className={`border-t ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+                    {/* Attempt Summary */}
+                    <div className={`p-6 border-b ${isDark ? 'border-gray-700 bg-gray-750' : 'border-gray-200 bg-gray-50'}`}>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Started At</p>
+                          <p className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                            {formatDate(attempt.startedAt)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Completed At</p>
+                          <p className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                            {formatDate(attempt.completedAt)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Duration</p>
+                          <p className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                            {formatDuration(attempt.startedAt, attempt.completedAt)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Questions and Responses */}
+                    <div className="p-6 space-y-6">
+                      {attemptResponses[attempt.attemptId] ? (
+                        questions.map((question, qIndex) => {
+                          const questionId = question.question_id || question.questionId || question.id;
+                          const response = attemptResponses[attempt.attemptId].find(r => r.questionId === questionId);
+                          return (
+                            <QuestionReviewCard
+                              key={`${attempt.attemptId}-${questionId || qIndex}`}
+                              question={question}
+                              response={response}
+                              index={qIndex}
+                              isDark={isDark}
+                            />
+                          );
+                        })
+                      ) : (
+                        <div className="text-center py-4">
+                          <Loader2 className={`w-8 h-8 mx-auto animate-spin ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
+                          <p className={`mt-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Loading responses...</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
-        <button
-          onClick={() => navigate('/Player/attempts')}
-          className={`px-6 py-3 rounded-xl font-medium transition-all ${
-            isDark
-              ? 'bg-gray-800 hover:bg-gray-700 text-white'
-              : 'bg-gray-200 hover:bg-gray-300 text-gray-900'
-          }`}
-        >
-          View All Attempts
-        </button>
       </div>
     </div>
   );
@@ -323,7 +391,6 @@ const QuestionReviewCard = ({ question, response, index, isDark }) => {
         const pairs = PlayerAnswer?.pairs || [];
         const correctPairs = question.content.correctPairs || question.content.correct_pairs || [];
         
-        // Check if each pair is correct
         const pairCorrectness = pairs.map(pair => {
           return correctPairs.some(cp => cp.left === pair.left && cp.right === pair.right);
         });
@@ -479,9 +546,9 @@ const QuestionReviewCard = ({ question, response, index, isDark }) => {
         );
 
       case 'matching':
+        const correctPairs = question.content.correctPairs || question.content.correct_pairs || [];
         const leftItems = question.content.leftItems || question.content.left_items || [];
         const rightItems = question.content.rightItems || question.content.right_items || [];
-        const correctPairs = question.content.correctPairs || question.content.correct_pairs || [];
         
         return (
           <div className={`p-4 rounded-xl ${isDark ? 'bg-green-900/20 border-green-700' : 'bg-green-50 border-green-200'} border`}>
@@ -490,11 +557,11 @@ const QuestionReviewCard = ({ question, response, index, isDark }) => {
                 const left = leftItems.find(l => l.id === pair.left);
                 const right = rightItems.find(r => r.id === pair.right);
                 return (
-                  <div key={idx} className="flex items-center gap-2">
+                  <div key={idx} className="flex items-center gap-3">
                     <span className={`font-medium ${isDark ? 'text-green-400' : 'text-green-700'}`}>
                       {left?.text || 'Unknown'}
                     </span>
-                    <span className={isDark ? 'text-green-400' : 'text-green-600'}>→</span>
+                    <span className={`font-bold ${isDark ? 'text-green-400' : 'text-green-600'}`}>→</span>
                     <span className={`font-medium ${isDark ? 'text-green-400' : 'text-green-700'}`}>
                       {right?.text || 'Unknown'}
                     </span>
@@ -506,21 +573,28 @@ const QuestionReviewCard = ({ question, response, index, isDark }) => {
         );
 
       case 'ordering':
-        const orderItems = question.content.items || [];
         const correctOrder = question.content.correctOrder || question.content.correct_order || [];
+        const items = question.content.items || [];
         
         return (
           <div className={`p-4 rounded-xl ${isDark ? 'bg-green-900/20 border-green-700' : 'bg-green-50 border-green-200'} border`}>
-            <ol className="list-decimal list-inside space-y-1">
+            <div className="space-y-2">
               {correctOrder.map((itemId, idx) => {
-                const item = orderItems.find(i => i.id === itemId);
+                const item = items.find(i => i.id === itemId);
                 return (
-                  <li key={idx} className={`font-medium ${isDark ? 'text-green-400' : 'text-green-700'}`}>
-                    {item?.text || 'Unknown'}
-                  </li>
+                  <div key={idx} className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold flex-shrink-0 ${
+                      isDark ? 'bg-green-900 text-green-400' : 'bg-green-100 text-green-700'
+                    }`}>
+                      {idx + 1}
+                    </div>
+                    <span className={`font-medium ${isDark ? 'text-green-400' : 'text-green-700'}`}>
+                      {item?.text || 'Unknown'}
+                    </span>
+                  </div>
                 );
               })}
-            </ol>
+            </div>
           </div>
         );
 
@@ -539,24 +613,26 @@ const QuestionReviewCard = ({ question, response, index, isDark }) => {
             }`}>
               Question {index + 1}
             </span>
-            <span className={`px-3 py-1 rounded-lg text-sm font-medium ${
-              isCorrect
-                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-            }`}>
-              {isCorrect ? <CheckCircle className="w-4 h-4 inline mr-1" /> : <XCircle className="w-4 h-4 inline mr-1" />}
-              {isCorrect ? 'Correct' : 'Incorrect'}
-            </span>
+            {isCorrect !== undefined && (
+              <span className={`px-3 py-1 rounded-lg text-sm font-medium ${
+                isCorrect
+                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                  : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+              }`}>
+                {isCorrect ? <CheckCircle className="w-4 h-4 inline mr-1" /> : <XCircle className="w-4 h-4 inline mr-1" />}
+                {isCorrect ? 'Correct' : 'Incorrect'}
+              </span>
+            )}
           </div>
           <QuestionText 
-            text={question.questionText}
+            text={question.questionText || question.content?.text}
             isDark={isDark}
             className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}
           />
         </div>
         <div className="text-right">
           <div className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-            {response?.pointsEarned || 0} / {question.points}
+            {response?.pointsEarned || 0} / {question.points || 10}
           </div>
           <div className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
             points
@@ -585,4 +661,4 @@ const QuestionReviewCard = ({ question, response, index, isDark }) => {
   );
 };
 
-export default AttemptDetails;
+export default AssignmentResponsesView;

@@ -671,14 +671,34 @@ public class AssignmentFunctions
             if (!Guid.TryParse(assignmentId, out var assignmentGuid))
                 return await req.BadRequestAsync("Invalid assignment ID");
 
-            var sql = "SELECT * FROM quiz.v_user_assignments WHERE assignment_id = @AssignmentId";
-            var assignment = await _dbService.QuerySingleAsync<dynamic>(sql, new { AssignmentId = assignmentGuid });
+            var sql = @"SELECT 
+                va.assignment_id, va.user_id, va.quiz_id, va.quiz_title, va.quiz_description, 
+                va.subject, va.difficulty, va.estimated_minutes, va.assigned_at, va.due_date, 
+                va.status, va.started_at, va.completed_at, va.score, va.max_attempts, 
+                va.attempts_used, va.is_mandatory, va.notes, va.assigned_by, 
+                va.hours_until_due, va.completion_time_minutes,
+                u.first_name as user_first_name, u.last_name as user_last_name, u.email as user_email,
+                ab.first_name as assigned_by_first_name, ab.last_name as assigned_by_last_name,
+                qa.created_at, qa.updated_at
+                FROM quiz.v_user_assignments va
+                LEFT JOIN lms.users u ON va.user_id = u.user_id
+                LEFT JOIN lms.users ab ON va.assigned_by::uuid = ab.user_id
+                INNER JOIN quiz.quiz_assignments qa ON va.assignment_id = qa.assignment_id
+                WHERE va.assignment_id = @AssignmentId";
+            
+            using var reader = await _dbService.ExecuteQueryAsync(sql, 
+                new NpgsqlParameter("@AssignmentId", NpgsqlTypes.NpgsqlDbType.Uuid) { Value = assignmentGuid });
 
-            if (assignment == null)
+            if (!await reader.ReadAsync())
                 return await req.NotFoundAsync("Assignment not found");
 
+            // Read values from the reader
+            var userId = reader.GetGuid(reader.GetOrdinal("user_id"));
+            var quizId = reader.GetGuid(reader.GetOrdinal("quiz_id"));
+            var assignmentIdValue = reader.GetGuid(reader.GetOrdinal("assignment_id"));
+            
             // Check authorization: user can see their own assignment, or admin/tutor can see all
-            var isOwner = assignment.user_id == authResult.UserId.ToString();
+            var isOwner = userId.ToString() == authResult.UserId.ToString();
             var hasAdminAccess = authResult.HasAnyRole("Administrator", "Tutors", "Content Creator");
 
             if (!isOwner && !hasAdminAccess)
@@ -686,29 +706,37 @@ public class AssignmentFunctions
 
             var response = new AssignmentResponse
             {
-                AssignmentId = assignment.assignment_id,
-                QuizId = assignment.quiz_id,
-                QuizTitle = assignment.quiz_title ?? "",
-                QuizDescription = assignment.quiz_description,
-                Subject = assignment.subject,
-                Difficulty = assignment.difficulty,
-                EstimatedMinutes = assignment.estimated_minutes,
-                UserId = assignment.user_id,
-                AssignedBy = assignment.assigned_by,
-                AssignedAt = assignment.assigned_at,
-                DueDate = assignment.due_date,
-                Status = assignment.status,
-                StartedAt = assignment.started_at,
-                CompletedAt = assignment.completed_at,
-                Score = assignment.score,
-                MaxAttempts = assignment.max_attempts,
-                AttemptsUsed = assignment.attempts_used,
-                IsMandatory = assignment.is_mandatory,
-                Notes = assignment.notes,
-                HoursUntilDue = assignment.hours_until_due,
-                CompletionTimeMinutes = assignment.completion_time_minutes
+                AssignmentId = assignmentIdValue,
+                QuizId = quizId,
+                QuizTitle = reader.IsDBNull(reader.GetOrdinal("quiz_title")) ? "" : reader.GetString(reader.GetOrdinal("quiz_title")),
+                QuizDescription = reader.IsDBNull(reader.GetOrdinal("quiz_description")) ? null : reader.GetString(reader.GetOrdinal("quiz_description")),
+                Subject = reader.IsDBNull(reader.GetOrdinal("subject")) ? null : reader.GetString(reader.GetOrdinal("subject")),
+                Difficulty = reader.IsDBNull(reader.GetOrdinal("difficulty")) ? null : reader.GetString(reader.GetOrdinal("difficulty")),
+                EstimatedMinutes = reader.IsDBNull(reader.GetOrdinal("estimated_minutes")) ? (int?)null : reader.GetInt32(reader.GetOrdinal("estimated_minutes")),
+                UserId = userId.ToString(),
+                UserFirstName = reader.IsDBNull(reader.GetOrdinal("user_first_name")) ? null : reader.GetString(reader.GetOrdinal("user_first_name")),
+                UserLastName = reader.IsDBNull(reader.GetOrdinal("user_last_name")) ? null : reader.GetString(reader.GetOrdinal("user_last_name")),
+                UserEmail = reader.IsDBNull(reader.GetOrdinal("user_email")) ? null : reader.GetString(reader.GetOrdinal("user_email")),
+                AssignedBy = reader.IsDBNull(reader.GetOrdinal("assigned_by")) ? null : reader.GetString(reader.GetOrdinal("assigned_by")),
+                AssignedByFirstName = reader.IsDBNull(reader.GetOrdinal("assigned_by_first_name")) ? null : reader.GetString(reader.GetOrdinal("assigned_by_first_name")),
+                AssignedByLastName = reader.IsDBNull(reader.GetOrdinal("assigned_by_last_name")) ? null : reader.GetString(reader.GetOrdinal("assigned_by_last_name")),
+                AssignedAt = reader.GetDateTime(reader.GetOrdinal("assigned_at")),
+                DueDate = reader.IsDBNull(reader.GetOrdinal("due_date")) ? (DateTime?)null : reader.GetDateTime(reader.GetOrdinal("due_date")),
+                Status = reader.GetString(reader.GetOrdinal("status")),
+                StartedAt = reader.IsDBNull(reader.GetOrdinal("started_at")) ? (DateTime?)null : reader.GetDateTime(reader.GetOrdinal("started_at")),
+                CompletedAt = reader.IsDBNull(reader.GetOrdinal("completed_at")) ? (DateTime?)null : reader.GetDateTime(reader.GetOrdinal("completed_at")),
+                Score = reader.IsDBNull(reader.GetOrdinal("score")) ? (decimal?)null : reader.GetDecimal(reader.GetOrdinal("score")),
+                MaxAttempts = reader.IsDBNull(reader.GetOrdinal("max_attempts")) ? (int?)null : reader.GetInt32(reader.GetOrdinal("max_attempts")),
+                AttemptsUsed = reader.IsDBNull(reader.GetOrdinal("attempts_used")) ? 0 : reader.GetInt32(reader.GetOrdinal("attempts_used")),
+                IsMandatory = reader.IsDBNull(reader.GetOrdinal("is_mandatory")) ? false : reader.GetBoolean(reader.GetOrdinal("is_mandatory")),
+                Notes = reader.IsDBNull(reader.GetOrdinal("notes")) ? null : reader.GetString(reader.GetOrdinal("notes")),
+                HoursUntilDue = reader.IsDBNull(reader.GetOrdinal("hours_until_due")) ? (double?)null : (double)reader.GetDecimal(reader.GetOrdinal("hours_until_due")),
+                CompletionTimeMinutes = reader.IsDBNull(reader.GetOrdinal("completion_time_minutes")) ? (double?)null : (double)reader.GetDecimal(reader.GetOrdinal("completion_time_minutes")),
+                CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
+                UpdatedAt = reader.GetDateTime(reader.GetOrdinal("updated_at"))
             };
 
+            await reader.DisposeAsync();
             return await req.OkAsync(response);
         }
         catch (Exception ex)
@@ -797,9 +825,16 @@ public class AssignmentFunctions
                 WHERE assignment_id = @AssignmentId
                 RETURNING assignment_id";
 
-            // Create anonymous object for parameters
-            var parameters = parameterValues.ToDictionary(p => p.key, p => p.value);
-            var result = await _dbService.QuerySingleAsync<dynamic>(sql, parameters);
+            // Execute update directly with connection
+            using var connection = await _dbService.GetConnectionAsync();
+            using var command = new NpgsqlCommand(sql, connection);
+            
+            foreach (var param in parameterValues)
+            {
+                command.Parameters.AddWithValue(param.key, param.value);
+            }
+            
+            var result = await command.ExecuteScalarAsync();
 
             if (result == null)
                 return await req.NotFoundAsync("Assignment not found");
