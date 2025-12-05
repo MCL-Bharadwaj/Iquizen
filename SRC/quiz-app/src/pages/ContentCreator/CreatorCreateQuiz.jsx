@@ -27,6 +27,8 @@ const CreatorCreateQuiz = ({ isDark }) => {
   const [questionsJson, setQuestionsJson] = useState('');
   const [batchLoading, setBatchLoading] = useState(false);
   const [batchErrors, setBatchErrors] = useState({});
+  const [editMode, setEditMode] = useState(false);
+  const [parsedQuestions, setParsedQuestions] = useState([]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -99,6 +101,94 @@ const CreatorCreateQuiz = ({ isDark }) => {
 
   const handleCancel = () => {
     navigate('/creator/dashboard');
+  };
+
+  const handleEdit = () => {
+    try {
+      // Parse questions JSON
+      const questions = JSON.parse(questionsJson);
+      if (!Array.isArray(questions)) {
+        setBatchErrors(prev => ({ ...prev, questions: 'Questions must be an array' }));
+        return;
+      }
+      setParsedQuestions(questions);
+      setEditMode(true);
+      setBatchErrors({});
+    } catch (e) {
+      setBatchErrors(prev => ({ ...prev, questions: 'Invalid JSON format for questions' }));
+    }
+  };
+
+  const handleQuestionChange = (index, field, value) => {
+    const updatedQuestions = [...parsedQuestions];
+    if (field.includes('.')) {
+      // Handle nested fields like content.correctAnswer
+      const [parent, child] = field.split('.');
+      updatedQuestions[index] = {
+        ...updatedQuestions[index],
+        [parent]: {
+          ...updatedQuestions[index][parent],
+          [child]: value
+        }
+      };
+    } else {
+      updatedQuestions[index] = {
+        ...updatedQuestions[index],
+        [field]: value
+      };
+    }
+    setParsedQuestions(updatedQuestions);
+    // Update the JSON textarea
+    setQuestionsJson(JSON.stringify(updatedQuestions, null, 2));
+  };
+
+  const handleOptionChange = (questionIndex, optionIndex, field, value) => {
+    const updatedQuestions = [...parsedQuestions];
+    const options = [...(updatedQuestions[questionIndex].content?.options || [])];
+    options[optionIndex] = {
+      ...options[optionIndex],
+      [field]: value
+    };
+    updatedQuestions[questionIndex] = {
+      ...updatedQuestions[questionIndex],
+      content: {
+        ...updatedQuestions[questionIndex].content,
+        options
+      }
+    };
+    setParsedQuestions(updatedQuestions);
+    // Update the JSON textarea
+    setQuestionsJson(JSON.stringify(updatedQuestions, null, 2));
+  };
+
+  const handleAddOption = (questionIndex) => {
+    const updatedQuestions = [...parsedQuestions];
+    const options = [...(updatedQuestions[questionIndex].content?.options || [])];
+    options.push({ value: '', label: '' });
+    updatedQuestions[questionIndex] = {
+      ...updatedQuestions[questionIndex],
+      content: {
+        ...updatedQuestions[questionIndex].content,
+        options
+      }
+    };
+    setParsedQuestions(updatedQuestions);
+    setQuestionsJson(JSON.stringify(updatedQuestions, null, 2));
+  };
+
+  const handleRemoveOption = (questionIndex, optionIndex) => {
+    const updatedQuestions = [...parsedQuestions];
+    const options = [...(updatedQuestions[questionIndex].content?.options || [])];
+    options.splice(optionIndex, 1);
+    updatedQuestions[questionIndex] = {
+      ...updatedQuestions[questionIndex],
+      content: {
+        ...updatedQuestions[questionIndex].content,
+        options
+      }
+    };
+    setParsedQuestions(updatedQuestions);
+    setQuestionsJson(JSON.stringify(updatedQuestions, null, 2));
   };
 
   const handleBatchImport = async () => {
@@ -489,9 +579,56 @@ const CreatorCreateQuiz = ({ isDark }) => {
 
             {/* Quiz JSON */}
             <div>
-              <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
-                Quiz JSON <span className="text-red-500">*</span>
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className={`block text-sm font-medium ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
+                  Quiz JSON <span className="text-red-500">*</span>
+                </label>
+                {/* Action Buttons */}
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={handleCancel}
+                    className={`
+                      px-4 py-2 rounded-lg font-medium transition-colors text-sm
+                      ${isDark 
+                        ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' 
+                        : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                      }
+                    `}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleEdit}
+                    className={`
+                      px-4 py-2 rounded-lg font-medium transition-colors text-sm
+                      ${isDark 
+                        ? 'bg-purple-600 hover:bg-purple-700 text-white' 
+                        : 'bg-purple-600 hover:bg-purple-700 text-white'
+                      }
+                    `}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleBatchImport}
+                    disabled={batchLoading}
+                    className={`
+                      flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors text-sm
+                      ${batchLoading 
+                        ? 'bg-gray-400 cursor-not-allowed' 
+                        : 'bg-blue-600 hover:bg-blue-700'
+                      }
+                      text-white
+                    `}
+                  >
+                    <Upload className="w-4 h-4" />
+                    <span>{batchLoading ? 'Importing...' : 'Import Quiz'}</span>
+                  </button>
+                </div>
+              </div>
               <textarea
                 value={quizJson}
                 onChange={(e) => setQuizJson(e.target.value)}
@@ -532,39 +669,165 @@ const CreatorCreateQuiz = ({ isDark }) => {
                 <p className="mt-1 text-sm text-red-500">{batchErrors.questions}</p>
               )}
             </div>
-          </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-4 justify-end">
-            <button
-              type="button"
-              onClick={handleCancel}
-              className={`
-                px-6 py-3 rounded-lg font-medium transition-colors
-                ${isDark 
-                  ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' 
-                  : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
-                }
-              `}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleBatchImport}
-              disabled={batchLoading}
-              className={`
-                flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors
-                ${batchLoading 
-                  ? 'bg-gray-400 cursor-not-allowed' 
-                  : 'bg-blue-600 hover:bg-blue-700'
-                }
-                text-white
-              `}
-            >
-              <Upload className="w-5 h-5" />
-              <span>{batchLoading ? 'Importing...' : 'Import Quiz'}</span>
-            </button>
+            {/* Parsed Questions Editor */}
+            {editMode && parsedQuestions.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                    Edit Questions ({parsedQuestions.length})
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setEditMode(false)}
+                    className={`text-sm px-3 py-1 rounded-lg ${isDark ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`}
+                  >
+                    Hide Editor
+                  </button>
+                </div>
+
+                {parsedQuestions.map((question, qIndex) => (
+                  <div
+                    key={qIndex}
+                    className={`p-6 rounded-lg border ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}`}
+                  >
+                    <div className="space-y-4">
+                      {/* Question Header */}
+                      <div className="flex items-start justify-between">
+                        <h4 className={`font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                          Question {qIndex + 1}
+                        </h4>
+                        <span className={`text-xs px-2 py-1 rounded ${isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-600'}`}>
+                          {question.questionType}
+                        </span>
+                      </div>
+
+                      {/* Question Text */}
+                      <div>
+                        <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                          Question Text
+                        </label>
+                        <textarea
+                          value={question.questionText || ''}
+                          onChange={(e) => handleQuestionChange(qIndex, 'questionText', e.target.value)}
+                          rows={2}
+                          className={`w-full px-3 py-2 rounded-lg border text-sm ${
+                            isDark
+                              ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                              : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+                          }`}
+                        />
+                      </div>
+
+                      {/* Question Metadata */}
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                            Difficulty
+                          </label>
+                          <select
+                            value={question.difficulty || 'medium'}
+                            onChange={(e) => handleQuestionChange(qIndex, 'difficulty', e.target.value)}
+                            className={`w-full px-3 py-2 rounded-lg border text-sm ${
+                              isDark
+                                ? 'bg-gray-700 border-gray-600 text-white'
+                                : 'bg-white border-gray-300 text-gray-900'
+                            }`}
+                          >
+                            <option value="easy">Easy</option>
+                            <option value="medium">Medium</option>
+                            <option value="hard">Hard</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                            Points
+                          </label>
+                          <input
+                            type="number"
+                            value={question.points || 10}
+                            onChange={(e) => handleQuestionChange(qIndex, 'points', parseInt(e.target.value) || 0)}
+                            className={`w-full px-3 py-2 rounded-lg border text-sm ${
+                              isDark
+                                ? 'bg-gray-700 border-gray-600 text-white'
+                                : 'bg-white border-gray-300 text-gray-900'
+                            }`}
+                          />
+                        </div>
+                        <div>
+                          <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                            Correct Answer
+                          </label>
+                          <input
+                            type="text"
+                            value={question.content?.correctAnswer || ''}
+                            onChange={(e) => handleQuestionChange(qIndex, 'content.correctAnswer', e.target.value)}
+                            className={`w-full px-3 py-2 rounded-lg border text-sm ${
+                              isDark
+                                ? 'bg-gray-700 border-gray-600 text-white'
+                                : 'bg-white border-gray-300 text-gray-900'
+                            }`}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Options */}
+                      {question.content?.options && (
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                              Options
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => handleAddOption(qIndex)}
+                              className={`text-xs px-2 py-1 rounded ${isDark ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'}`}
+                            >
+                              + Add Option
+                            </button>
+                          </div>
+                          <div className="space-y-2">
+                            {question.content.options.map((option, oIndex) => (
+                              <div key={oIndex} className="flex gap-2">
+                                <input
+                                  type="text"
+                                  placeholder="Value"
+                                  value={option.value || ''}
+                                  onChange={(e) => handleOptionChange(qIndex, oIndex, 'value', e.target.value)}
+                                  className={`flex-1 px-3 py-2 rounded-lg border text-sm ${
+                                    isDark
+                                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-500'
+                                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+                                  }`}
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Label"
+                                  value={option.label || ''}
+                                  onChange={(e) => handleOptionChange(qIndex, oIndex, 'label', e.target.value)}
+                                  className={`flex-1 px-3 py-2 rounded-lg border text-sm ${
+                                    isDark
+                                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-500'
+                                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+                                  }`}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveOption(qIndex, oIndex)}
+                                  className={`px-3 py-2 rounded-lg text-sm ${isDark ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-600 hover:bg-red-700 text-white'}`}
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
