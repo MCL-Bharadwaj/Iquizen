@@ -164,7 +164,7 @@ const CreatorCreateQuiz = ({ isDark }) => {
   const handleAddOption = (questionIndex) => {
     const updatedQuestions = [...parsedQuestions];
     const options = [...(updatedQuestions[questionIndex].content?.options || [])];
-    options.push({ value: '', label: '' });
+    options.push({ id: '', text: '' });
     updatedQuestions[questionIndex] = {
       ...updatedQuestions[questionIndex],
       content: {
@@ -655,7 +655,7 @@ const CreatorCreateQuiz = ({ isDark }) => {
               <textarea
                 value={questionsJson}
                 onChange={(e) => setQuestionsJson(e.target.value)}
-                placeholder={`[\n  {\n    "questionText": "What is 2+2?",\n    "questionType": "multiple_choice_single",\n    "difficulty": "easy",\n    "points": 10,\n    "content": {\n      "options": [\n        { "value": "3", "label": "3" },\n        { "value": "4", "label": "4" }\n      ],\n      "correctAnswer": "4"\n    }\n  }\n]`}
+                placeholder={`[\n  {\n    "questionText": "What is 2+2?",\n    "questionType": "multiple_choice_single",\n    "difficulty": "easy",\n    "points": 10,\n    "content": {\n      "options": [\n        { "id": "3", "text": "3" },\n        { "id": "4", "text": "4" }\n      ],\n      "correctAnswer": "4"\n    }\n  }\n]`}
                 rows={12}
                 className={`
                   w-full px-4 py-2 rounded-lg border transition-colors font-mono text-sm
@@ -791,9 +791,9 @@ const CreatorCreateQuiz = ({ isDark }) => {
                               <div key={oIndex} className="flex gap-2">
                                 <input
                                   type="text"
-                                  placeholder="Value"
-                                  value={option.value || ''}
-                                  onChange={(e) => handleOptionChange(qIndex, oIndex, 'value', e.target.value)}
+                                  placeholder="ID"
+                                  value={option.id || ''}
+                                  onChange={(e) => handleOptionChange(qIndex, oIndex, 'id', e.target.value)}
                                   className={`flex-1 px-3 py-2 rounded-lg border text-sm ${
                                     isDark
                                       ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-500'
@@ -802,9 +802,9 @@ const CreatorCreateQuiz = ({ isDark }) => {
                                 />
                                 <input
                                   type="text"
-                                  placeholder="Label"
-                                  value={option.label || ''}
-                                  onChange={(e) => handleOptionChange(qIndex, oIndex, 'label', e.target.value)}
+                                  placeholder="Text"
+                                  value={option.text || ''}
+                                  onChange={(e) => handleOptionChange(qIndex, oIndex, 'text', e.target.value)}
                                   className={`flex-1 px-3 py-2 rounded-lg border text-sm ${
                                     isDark
                                       ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-500'

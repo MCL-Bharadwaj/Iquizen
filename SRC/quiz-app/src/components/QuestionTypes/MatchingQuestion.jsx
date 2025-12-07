@@ -3,8 +3,23 @@ import { Check } from 'lucide-react';
 
 const MatchingQuestion = ({ question, answer, onChange, isDark }) => {
   const leftItems = question.content.leftItems || question.content.left_items || [];
-  const rightItems = question.content.rightItems || question.content.right_items || [];
+  const rightItemsOriginal = question.content.rightItems || question.content.right_items || [];
   const prevQuestionIdRef = useRef(null);
+  
+  // Shuffle function
+  function shuffleArray(array) {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  }
+  
+  // Initialize shuffled right items
+  const [rightItems, setRightItems] = useState(() => {
+    return shuffleArray([...rightItemsOriginal]);
+  });
   
   // Store pairs as { leftId: rightId }
   const [pairs, setPairs] = useState(() => {
@@ -30,6 +45,9 @@ const MatchingQuestion = ({ question, answer, onChange, isDark }) => {
     if (prevQuestionIdRef.current !== question.questionId) {
       prevQuestionIdRef.current = question.questionId;
       
+      // Shuffle right items for new question
+      setRightItems(shuffleArray([...rightItemsOriginal]));
+      
       if (answer?.answer?.pairs && Array.isArray(answer.answer.pairs)) {
         const pairMap = {};
         answer.answer.pairs.forEach(pair => {
@@ -42,7 +60,7 @@ const MatchingQuestion = ({ question, answer, onChange, isDark }) => {
       setSelectedLeft(null);
       setHoveredRight(null);
     }
-  });
+  }, [question.questionId, answer]);
 
   // Update parent when pairs change
   useEffect(() => {

@@ -295,20 +295,90 @@ const QuestionReviewCard = ({ question, response, index, isDark }) => {
         );
 
       case 'fill_in_blank':
+        const blanksForFillIn = question.content.blanks || [];
         return (
           <div className={`p-4 rounded-xl ${isDark ? 'bg-gray-700/50' : 'bg-gray-100'}`}>
             {Array.isArray(PlayerAnswer) && PlayerAnswer.length > 0 ? (
               <div className="space-y-2">
-                {PlayerAnswer.map((answer, idx) => (
-                  <div key={idx}>
-                    <span className={`font-medium ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>
-                      Blank {idx + 1}:
-                    </span>
-                    <span className={`ml-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                      {answer || '(empty)'}
-                    </span>
-                  </div>
-                ))}
+                {PlayerAnswer.map((answer, idx) => {
+                  const blank = blanksForFillIn[idx];
+                  return (
+                    <div key={idx}>
+                      <span className={`font-medium ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>
+                        Blank {blank?.position !== undefined ? blank.position + 1 : idx + 1}:
+                      </span>
+                      <span className={`ml-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                        {answer || '(empty)'}
+                      </span>
+                      {blank?.hint && (
+                        <span className={`ml-2 text-sm italic ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+                          (hint: {blank.hint})
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className={`italic ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                No answers provided
+              </p>
+            )}
+          </div>
+        );
+
+      case 'fill_in_blank_drag_drop':
+        const blanksData = question.content.blanks || [];
+        const wordBankForDisplay = question.content.wordBank || question.content.word_bank || [];
+        
+        // Handle multiple answer formats
+        let selectedItemsMap = {};
+        
+        if (Array.isArray(PlayerAnswer)) {
+          // New format: Simple array ["gte", "lte"] - matches fill_in_blank format
+          PlayerAnswer.forEach((answerId, idx) => {
+            if (answerId) {
+              const wordItem = wordBankForDisplay.find(w => w.id === answerId);
+              if (wordItem) {
+                selectedItemsMap[idx] = wordItem;
+              }
+            }
+          });
+        } else if (PlayerAnswer?.selectedItems) {
+          // Object format: { selectedItems: { 0: {id, text}, 1: {id, text} } }
+          selectedItemsMap = PlayerAnswer.selectedItems;
+        } else if (PlayerAnswer?.blanks) {
+          // Old format: { blanks: [{position: 1, selected_id: "add_assign"}] }
+          PlayerAnswer.blanks.forEach(blank => {
+            const wordItem = wordBankForDisplay.find(w => w.id === blank.selected_id);
+            if (wordItem) {
+              selectedItemsMap[blank.position] = wordItem;
+            }
+          });
+        }
+        
+        return (
+          <div className={`p-4 rounded-xl ${isDark ? 'bg-gray-700/50' : 'bg-gray-100'}`}>
+            {Object.keys(selectedItemsMap).length > 0 ? (
+              <div className="space-y-2">
+                {blanksData.map((blank, idx) => {
+                  const selectedItem = selectedItemsMap[idx] || selectedItemsMap[blank.position];
+                  return (
+                    <div key={idx}>
+                      <span className={`font-medium ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>
+                        Blank {blank.position + 1}:
+                      </span>
+                      <span className={`ml-2 px-3 py-1 rounded ${isDark ? 'bg-purple-900/30 text-purple-300' : 'bg-purple-100 text-purple-700'}`}>
+                        {selectedItem?.text || '(empty)'}
+                      </span>
+                      {blank.hint && (
+                        <span className={`ml-2 text-sm italic ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+                          (hint: {blank.hint})
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <p className={`italic ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
@@ -462,19 +532,63 @@ const QuestionReviewCard = ({ question, response, index, isDark }) => {
         );
 
       case 'fill_in_blank':
+        const fillInBlanks = question.content.blanks || [];
         return (
           <div className={`p-4 rounded-xl ${isDark ? 'bg-green-900/20 border-green-700' : 'bg-green-50 border-green-200'} border`}>
             <div className="space-y-2">
-              {question.content.blanks.map((blank, idx) => (
-                <div key={idx}>
-                  <span className={`font-medium ${isDark ? 'text-green-400' : 'text-green-700'}`}>
-                    Blank {idx + 1}:
-                  </span>
-                  <span className={`ml-2 ${isDark ? 'text-green-300' : 'text-green-800'}`}>
-                    {blank.acceptedAnswers?.join(' or ') || 'No answer specified'}
-                  </span>
-                </div>
-              ))}
+              {fillInBlanks.map((blank, idx) => {
+                // Handle both accepted_answers and acceptedAnswers (snake_case and camelCase)
+                const acceptedAnswers = blank.accepted_answers || blank.acceptedAnswers || [];
+                return (
+                  <div key={idx}>
+                    <span className={`font-medium ${isDark ? 'text-green-400' : 'text-green-700'}`}>
+                      Blank {blank.position !== undefined ? blank.position + 1 : idx + 1}:
+                    </span>
+                    <span className={`ml-2 ${isDark ? 'text-green-300' : 'text-green-800'}`}>
+                      {acceptedAnswers.length > 0 ? acceptedAnswers.join(' or ') : 'No answer specified'}
+                    </span>
+                    {blank.hint && (
+                      <span className={`ml-2 text-sm italic ${isDark ? 'text-green-600' : 'text-green-600'}`}>
+                        (hint: {blank.hint})
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+
+      case 'fill_in_blank_drag_drop':
+        const dragDropBlanks = question.content.blanks || [];
+        const wordBank = question.content.wordBank || question.content.word_bank || [];
+        
+        return (
+          <div className={`p-4 rounded-xl ${isDark ? 'bg-green-900/20 border-green-700' : 'bg-green-50 border-green-200'} border`}>
+            <div className="space-y-2">
+              {dragDropBlanks.map((blank, idx) => {
+                // Get correct answer from accepted_answers array or correctAnswer field
+                const correctAnswerId = blank.correctAnswer || 
+                                       (blank.accepted_answers && blank.accepted_answers[0]) ||
+                                       (blank.acceptedAnswers && blank.acceptedAnswers[0]);
+                const correctWord = wordBank.find(word => word.id === correctAnswerId);
+                
+                return (
+                  <div key={idx}>
+                    <span className={`font-medium ${isDark ? 'text-green-400' : 'text-green-700'}`}>
+                      Blank {blank.position + 1}:
+                    </span>
+                    <span className={`ml-2 px-3 py-1 rounded ${isDark ? 'bg-green-900/40 text-green-300' : 'bg-green-100 text-green-800'}`}>
+                      {correctWord?.text || correctAnswerId || 'No answer specified'}
+                    </span>
+                    {blank.hint && (
+                      <span className={`ml-2 text-sm italic ${isDark ? 'text-green-600' : 'text-green-600'}`}>
+                        (hint: {blank.hint})
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         );
@@ -564,6 +678,44 @@ const QuestionReviewCard = ({ question, response, index, isDark }) => {
           </div>
         </div>
       </div>
+
+      {/* Render template for fill_in_blank and fill_in_blank_drag_drop questions */}
+      {(question.questionType === 'fill_in_blank' || question.questionType === 'fill_in_blank_drag_drop') && question.content.template && (
+        <div className="mb-4">
+          {(() => {
+            const template = question.content.template;
+            const codeBlockMatch = template.match(/```(\w+)?\n([\s\S]*?)```/);
+            
+            if (codeBlockMatch) {
+              const language = codeBlockMatch[1] || '';
+              const codeContent = codeBlockMatch[2];
+              
+              return (
+                <div className={`
+                  font-mono text-sm leading-relaxed p-6 rounded-lg
+                  ${isDark ? 'bg-gray-900 text-gray-200' : 'bg-gray-50 text-gray-900'}
+                  overflow-x-auto
+                `}>
+                  {language && (
+                    <div className={`text-xs mb-3 pb-2 border-b ${isDark ? 'text-gray-500 border-gray-700' : 'text-gray-600 border-gray-300'}`}>
+                      {language}
+                    </div>
+                  )}
+                  <div className="whitespace-pre-wrap">{codeContent.replace(/___/g, '____')}</div>
+                </div>
+              );
+            }
+            
+            return (
+              <div className={`p-4 rounded-xl text-lg ${
+                isDark ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-900'
+              }`}>
+                {template.replace(/___/g, '____')}
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       <div className="space-y-4">
         <div>

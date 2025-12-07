@@ -2,8 +2,51 @@ import { useState, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 
 const FillInBlankDragDrop = ({ question, answer, onChange, isDark }) => {
-  const { template, blanks, word_bank, allow_reuse } = question.content;
+  // Handle nested content structure (sometimes content.content exists due to import issues)
+  let content = question?.content || {};
+  
+  // Check if content has a nested content property and use that instead
+  if (content.content && typeof content.content === 'object') {
+    content = content.content;
+  }
+  
+  const template = content.template || '';
+  const blanks = content.blanks || [];
+  const word_bank = content.word_bank || [];
+  const wordBank = content.wordBank || [];
+  const allow_reuse = content.allow_reuse || content.allowReuse || false;
+  
+  // Support both word_bank (snake_case) and wordBank (camelCase)
+  let wordBankArray = word_bank.length > 0 ? word_bank : wordBank;
+  
+  // Convert old format (value/label) to new format (id/text) if needed
+  wordBankArray = wordBankArray.map(item => {
+    if (item.value && item.label && !item.id && !item.text) {
+      return {
+        id: item.value,
+        text: item.label,
+        category: item.category
+      };
+    }
+    return item;
+  });
+  
   const prevQuestionIdRef = useRef(null);
+  
+  // Early return if required data is missing
+  if (!template || blanks.length === 0 || wordBankArray.length === 0) {
+    console.error('FillInBlankDragDrop - Missing data:', { 
+      hasTemplate: !!template, 
+      blanksCount: blanks.length, 
+      wordBankCount: wordBankArray.length,
+      content: content 
+    });
+    return (
+      <div className={`p-6 rounded-xl ${isDark ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
+        <p className="text-center">⚠️ Question data incomplete. Missing template, blanks, or word bank.</p>
+      </div>
+    );
+  }
   
   // Initialize selected items for each blank
   const [selectedItems, setSelectedItems] = useState(() => {
@@ -14,7 +57,7 @@ const FillInBlankDragDrop = ({ question, answer, onChange, isDark }) => {
       
       const initial = {};
       answerData.blanks?.forEach(b => {
-        initial[b.position] = word_bank.find(w => w.id === b.selected_id);
+        initial[b.position] = wordBankArray.find(w => w.id === b.selected_id);
       });
       return initial;
     }
@@ -38,7 +81,7 @@ const FillInBlankDragDrop = ({ question, answer, onChange, isDark }) => {
         const initial = {};
         if (answerData.blanks && Array.isArray(answerData.blanks)) {
           answerData.blanks.forEach(b => {
-            const foundWord = word_bank.find(w => w.id === b.selected_id);
+            const foundWord = wordBankArray.find(w => w.id === b.selected_id);
             if (foundWord) {
               initial[b.position] = foundWord;
             }
@@ -55,11 +98,18 @@ const FillInBlankDragDrop = ({ question, answer, onChange, isDark }) => {
 
   // Update parent when selection changes
   useEffect(() => {
-    const blanksAnswer = blanks.map(blank => ({
-      position: blank.position,
-      selected_id: selectedItems[blank.position]?.id || ''
-    }));
-    onChange({ blanks: blanksAnswer });
+    // Backend expects: {"blanks": [{"position": 1, "selected_id": "op1"}, ...]}
+    // Backend compares selected_id against accepted_answers, which may contain text or id
+    const blanksArray = blanks.map(blank => {
+      const selected = selectedItems[blank.position];
+      return {
+        position: blank.position,
+        selected_id: selected ? selected.text : '' // Send text value for grading
+      };
+    });
+    
+    // Send in the format expected by backend
+    onChange({ blanks: blanksArray });
   }, [selectedItems]);
 
   // Check if word is already used (if reuse not allowed)
@@ -116,6 +166,96 @@ const FillInBlankDragDrop = ({ question, answer, onChange, isDark }) => {
 
   // Parse template and create inline blanks
   const renderTemplate = () => {
+    // Check if template contains code blocks (triple backticks)
+    const codeBlockMatch = template.match(/```(\w+)?\n([\s\S]*?)```/);
+    
+    if (codeBlockMatch) {
+      const language = codeBlockMatch[1] || '';
+      const codeContent = codeBlockMatch[2];
+      const parts = codeContent.split('___');
+      const elements = [];
+      
+      parts.forEach((part, index) => {
+        // Add code text part
+        if (part) {
+          elements.push(
+            <span key={`text-${index}`} className="whitespace-pre">
+              {part}
+            </span>
+          );
+        }
+        
+        // Add blank (if not last part)
+        if (index < parts.length - 1 && index < blanks.length) {
+          const blank = blanks[index];
+          const selected = selectedItems[blank.position];
+          const isHovered = hoveredBlank === blank.position;
+          
+          elements.push(
+            <span
+              key={`blank-${index}`}
+              onDragOver={(e) => handleDragOver(e, blank.position)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, blank.position)}
+              className={`
+                inline-flex items-center gap-2 px-3 py-1 mx-1 rounded border-2 border-dashed
+                min-w-[100px] transition-all font-mono text-sm
+                ${selected
+                  ? isDark 
+                    ? 'bg-blue-900/40 border-blue-400' 
+                    : 'bg-blue-100 border-blue-500'
+                  : isHovered
+                  ? isDark
+                    ? 'bg-blue-900/30 border-blue-300 scale-105'
+                    : 'bg-blue-50 border-blue-400 scale-105'
+                  : isDark
+                  ? 'bg-gray-800 border-gray-600 hover:border-blue-500'
+                  : 'bg-gray-100 border-gray-400 hover:border-blue-400'
+                }
+              `}
+            >
+              {selected ? (
+                <>
+                  <span className={`font-bold ${isDark ? 'text-yellow-300' : 'text-purple-700'}`}>
+                    {selected.text}
+                  </span>
+                  <button
+                    onClick={() => handleRemove(blank.position)}
+                    className={`p-0.5 rounded hover:bg-red-500/20 transition-colors`}
+                    type="button"
+                  >
+                    <X className="w-3 h-3 text-red-500" />
+                  </button>
+                </>
+              ) : (
+                <span className={`text-xs italic ${isDark ? 'text-gray-600' : 'text-gray-500'}`}>
+                  drop
+                </span>
+              )}
+            </span>
+          );
+        }
+      });
+      
+      return (
+        <div className={`
+          font-mono text-sm leading-relaxed p-6 rounded-lg
+          ${isDark ? 'bg-gray-900 text-gray-200' : 'bg-gray-50 text-gray-900'}
+          overflow-x-auto
+        `}>
+          {language && (
+            <div className={`text-xs mb-3 pb-2 border-b ${isDark ? 'text-gray-500 border-gray-700' : 'text-gray-600 border-gray-300'}`}>
+              {language}
+            </div>
+          )}
+          <div className="whitespace-pre-wrap">
+            {elements}
+          </div>
+        </div>
+      );
+    }
+    
+    // Regular template (non-code)
     const parts = template.split('___');
     const elements = [];
     
@@ -173,7 +313,7 @@ const FillInBlankDragDrop = ({ question, answer, onChange, isDark }) => {
               </>
             ) : (
               <span className={`text-sm italic ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                {blank.hint || 'Drop here'}
+                Drop here
               </span>
             )}
           </span>
@@ -209,7 +349,7 @@ const FillInBlankDragDrop = ({ question, answer, onChange, isDark }) => {
           📚 Word Bank
         </h3>
         <div className="flex flex-wrap gap-3">
-          {word_bank.map(item => {
+          {wordBankArray.map(item => {
             const used = isWordUsed(item.id);
             return (
               <div

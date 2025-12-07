@@ -24,7 +24,7 @@ const OrderingQuestion = ({ question, answer, onChange, isDark }) => {
         : answer.answer.order;
       return answerOrder.map(id => orderItems.find(item => item.id === id)).filter(Boolean);
     }
-    // Otherwise, shuffle the items
+    // Otherwise, shuffle the items (always shuffle for new questions)
     return shuffleArray([...orderItems]);
   });
 
@@ -47,7 +47,7 @@ const OrderingQuestion = ({ question, answer, onChange, isDark }) => {
           setItems(orderedItems);
         }
       } else {
-        // Otherwise, shuffle the items for this new question
+        // Otherwise, ALWAYS shuffle the items for this new question
         if (orderItems.length > 0) {
           setItems(shuffleArray([...orderItems]));
         }
@@ -55,7 +55,7 @@ const OrderingQuestion = ({ question, answer, onChange, isDark }) => {
       setDraggedItem(null);
       setDragOverIndex(null);
     }
-  });
+  }, [question.questionId, answer]); // Add dependencies to prevent infinite loop
 
   // Update parent when items change
   useEffect(() => {

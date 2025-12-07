@@ -751,30 +751,131 @@ const QuestionRenderer = ({ question, answer, onChange, isDark }) => {
       );
 
     case 'fill_in_blank':
+      const blanks = question.content.blanks || [];
+      const template = question.content.template;
+      // Initialize answers array with correct length if not exists
+      const currentAnswers = answer?.answer || new Array(blanks.length).fill('');
+      
+      // If template exists, render it with inline blanks
+      if (template) {
+        // Check if template contains code blocks
+        const codeBlockMatch = template.match(/```(\w+)?\n([\s\S]*?)```/);
+        
+        if (codeBlockMatch) {
+          const language = codeBlockMatch[1] || '';
+          const codeContent = codeBlockMatch[2];
+          const parts = codeContent.split('___');
+          
+          return (
+            <div className="space-y-4">
+              <div className={`
+                font-mono text-sm leading-relaxed p-6 rounded-lg
+                ${isDark ? 'bg-gray-900 text-gray-200' : 'bg-gray-50 text-gray-900'}
+                overflow-x-auto
+              `}>
+                {language && (
+                  <div className={`text-xs mb-3 pb-2 border-b ${isDark ? 'text-gray-500 border-gray-700' : 'text-gray-600 border-gray-300'}`}>
+                    {language}
+                  </div>
+                )}
+                <div className="whitespace-pre-wrap">
+                  {parts.map((part, index) => (
+                    <span key={index}>
+                      <span className="whitespace-pre">{part}</span>
+                      {index < parts.length - 1 && (
+                        <input
+                          type="text"
+                          value={currentAnswers[index] || ''}
+                          onChange={(e) => {
+                            const newAnswers = [...currentAnswers];
+                            newAnswers[index] = e.target.value;
+                            onChange(newAnswers);
+                          }}
+                          className={`
+                            inline-flex px-3 py-1 mx-1 rounded border-2
+                            min-w-[100px] font-mono text-sm
+                            ${isDark
+                              ? 'bg-gray-800 border-gray-600 text-yellow-300 focus:border-blue-500'
+                              : 'bg-white border-gray-400 text-purple-700 focus:border-blue-500'
+                            }
+                            focus:outline-none focus:ring-2 focus:ring-blue-500/50
+                          `}
+                        />
+                      )}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        }
+        
+        // Regular template (non-code)
+        const parts = template.split('___');
+        return (
+          <div className="space-y-4">
+            <div className={`p-6 rounded-xl text-lg leading-loose ${
+              isDark ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'
+            }`}>
+              {parts.map((part, index) => (
+                <span key={index}>
+                  <span>{part}</span>
+                  {index < parts.length - 1 && (
+                    <input
+                      type="text"
+                      value={currentAnswers[index] || ''}
+                      onChange={(e) => {
+                        const newAnswers = [...currentAnswers];
+                        newAnswers[index] = e.target.value;
+                        onChange(newAnswers);
+                      }}
+                      className={`
+                        inline-flex px-4 py-2 mx-1 rounded-lg border-2
+                        min-w-[120px]
+                        ${isDark
+                          ? 'bg-gray-700 border-gray-600 text-white focus:border-blue-500'
+                          : 'bg-gray-50 border-gray-300 text-gray-900 focus:border-blue-400'
+                        }
+                        focus:outline-none focus:ring-2 focus:ring-blue-500/50
+                      `}
+                    />
+                  )}
+                </span>
+              ))}
+            </div>
+          </div>
+        );
+      }
+      
+      // Fallback: No template, show individual input fields
       return (
         <div className="space-y-4">
-          {question.content.blanks.map((blank, index) => (
-            <div key={index} className="space-y-2">
-              <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                Blank {index + 1}: {blank.hint}
-              </label>
-              <input
-                type="text"
-                value={answer?.answer?.[index] || ''}
-                onChange={(e) => {
-                  const newAnswers = answer?.answer || [];
-                  newAnswers[index] = e.target.value;
-                  onChange([...newAnswers]);
-                }}
-                className={`w-full px-4 py-3 rounded-xl border-2 ${
-                  isDark
-                    ? 'bg-gray-700 border-gray-600 text-white'
-                    : 'bg-white border-gray-200 text-gray-900'
-                }`}
-                placeholder={`Enter answer for blank ${index + 1}`}
-              />
-            </div>
-          ))}
+          {blanks.map((blank, index) => {
+            // Use blank.position if available, otherwise use index
+            const blankNumber = blank.position !== undefined ? blank.position + 1 : index + 1;
+            return (
+              <div key={index} className="space-y-2">
+                <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Blank {blankNumber}{blank.hint ? `: ${blank.hint}` : ''}
+                </label>
+                <input
+                  type="text"
+                  value={currentAnswers[index] || ''}
+                  onChange={(e) => {
+                    const newAnswers = [...currentAnswers];
+                    newAnswers[index] = e.target.value;
+                    onChange(newAnswers);
+                  }}
+                  className={`w-full px-4 py-3 rounded-xl border-2 ${
+                    isDark
+                      ? 'bg-gray-700 border-gray-600 text-white'
+                      : 'bg-white border-gray-200 text-gray-900'
+                  }`}
+                  placeholder={`Enter answer for blank ${blankNumber}`}
+                />
+              </div>
+            );
+          })}
         </div>
       );
 
