@@ -558,6 +558,18 @@ export const playerApi = {
       throw error;
     }
   },
+
+  // Get current player ID from JWT token (no API call needed since player_id = user_id)
+  getCurrentPlayerId: () => {
+    const userId = helpers.getUserId();
+    
+    if (!userId) {
+      console.error('No user ID found in token. Please ensure you are logged in.');
+      return null;
+    }
+    
+    return userId; // player_id is the same as user_id
+  },
 };
 
 // ==================== HELPER FUNCTIONS ====================
