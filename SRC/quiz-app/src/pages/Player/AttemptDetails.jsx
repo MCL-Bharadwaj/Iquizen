@@ -7,6 +7,7 @@ import { QuestionText } from '../../components/CodeBlock';
 const AttemptDetails = ({ isDark }) => {
   const { attemptId } = useParams();
   const navigate = useNavigate();
+  const userId = helpers.getUserId('Player');
 
   const [loading, setLoading] = useState(true);
   const [attempt, setAttempt] = useState(null);
@@ -41,7 +42,7 @@ const AttemptDetails = ({ isDark }) => {
       setResponses(responsesData.data || responsesData.responses || []);
 
       // Fetch all user attempts to check if retake is allowed
-      const userAttemptsData = await attemptApi.getUserAttempts();
+      const userAttemptsData = await attemptApi.getUserAttempts(userId);
       const attemptsForThisQuiz = (userAttemptsData.attempts || []).filter(
         a => a.quizId === attemptData.quizId && a.status === 'completed'
       );
