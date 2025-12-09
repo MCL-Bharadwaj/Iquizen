@@ -235,6 +235,618 @@ const CreatorCreateQuiz = ({ isDark }) => {
     }
   };
 
+  // Helper function to render correct answer section based on question type
+  const renderCorrectAnswerSection = (question, qIndex, isDark) => {
+    const { questionType, content } = question;
+
+    switch (questionType) {
+      case 'multiple_choice_single':
+        return (
+          <div>
+            <label className={`block text-sm font-semibold mb-2 ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
+              Correct Answer (Option ID)
+            </label>
+            <input
+              type="text"
+              value={content?.correctAnswer || ''}
+              onChange={(e) => handleQuestionChange(qIndex, 'content.correctAnswer', e.target.value)}
+              placeholder="e.g., A"
+              className={`w-full px-4 py-3 rounded-lg border-2 text-sm transition-colors ${
+                isDark
+                  ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-green-500'
+                  : 'bg-green-50 border-green-200 text-gray-900 placeholder-gray-400 focus:border-green-500'
+              }`}
+            />
+          </div>
+        );
+
+      case 'multiple_choice_multi':
+        const correctAnswers = content?.correctAnswers || [];
+        return (
+          <div>
+            <label className={`block text-sm font-semibold mb-2 ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
+              Correct Answers (Multiple - Comma separated IDs)
+            </label>
+            <input
+              type="text"
+              value={Array.isArray(correctAnswers) ? correctAnswers.join(', ') : ''}
+              onChange={(e) => {
+                const answerArray = e.target.value.split(',').map(s => s.trim()).filter(s => s);
+                handleQuestionChange(qIndex, 'content.correctAnswers', answerArray);
+              }}
+              placeholder="e.g., A, C, D"
+              className={`w-full px-4 py-3 rounded-lg border-2 text-sm transition-colors ${
+                isDark
+                  ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-green-500'
+                  : 'bg-green-50 border-green-200 text-gray-900 placeholder-gray-400 focus:border-green-500'
+              }`}
+            />
+            <p className={`text-xs mt-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+              Current: [{correctAnswers.join(', ')}]
+            </p>
+          </div>
+        );
+
+      case 'fill_in_blank':
+        const blanks = content?.blanks || [];
+        return (
+          <div className="space-y-4">
+            {/* Editable Correct Answers Summary */}
+            {blanks.length > 0 && (
+              <div>
+                <label className={`block text-sm font-semibold mb-2 ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
+                  Correct Answers
+                </label>
+                <div className="space-y-2">
+                  {blanks.map((blank, bIdx) => (
+                    <div key={bIdx} className="flex items-center gap-3">
+                      <span className={`text-sm font-medium min-w-[80px] ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        Blank #{blank.position}
+                      </span>
+                      <input
+                        type="text"
+                        value={Array.isArray(blank.acceptedAnswers) ? blank.acceptedAnswers.join(', ') : ''}
+                        onChange={(e) => {
+                          const answers = e.target.value.split(',').map(s => s.trim()).filter(s => s);
+                          const newBlanks = [...blanks];
+                          newBlanks[bIdx] = { ...newBlanks[bIdx], acceptedAnswers: answers };
+                          handleQuestionChange(qIndex, 'content.blanks', newBlanks);
+                        }}
+                        placeholder="e.g., 0, zero"
+                        className={`flex-1 px-4 py-3 rounded-lg border-2 text-sm transition-colors ${
+                          isDark
+                            ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-green-500'
+                            : 'bg-green-50 border-green-200 text-gray-900 placeholder-gray-400 focus:border-green-500'
+                        }`}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <p className={`text-xs mt-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  Separate multiple accepted answers with commas (e.g., "0, zero")
+                </p>
+              </div>
+            )}
+            
+            <div className="flex items-center justify-between mb-2">
+              <label className={`block text-sm font-semibold ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
+                Blanks (Fill-in-the-Blank Answers)
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  const newBlanks = [...(content?.blanks || []), {
+                    position: blanks.length + 1,
+                    acceptedAnswers: [],
+                    hint: '',
+                    caseSensitive: false
+                  }];
+                  handleQuestionChange(qIndex, 'content.blanks', newBlanks);
+                }}
+                className={`text-xs px-3 py-1 rounded-lg font-medium ${isDark ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'}`}
+              >
+                + Add Blank
+              </button>
+            </div>
+            {blanks.length === 0 ? (
+              <p className={`text-sm italic ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>No blanks defined</p>
+            ) : (
+              <div className="space-y-3">
+                {blanks.map((blank, bIndex) => (
+                  <div key={bIndex} className={`p-3 rounded-lg border ${isDark ? 'bg-gray-750 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className={`text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        Blank #{blank.position}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newBlanks = blanks.filter((_, i) => i !== bIndex);
+                          handleQuestionChange(qIndex, 'content.blanks', newBlanks);
+                        }}
+                        className="text-xs text-red-500 hover:text-red-700"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    <div>
+                      <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                        Accepted Answers (comma separated)
+                      </label>
+                      <input
+                        type="text"
+                        value={Array.isArray(blank.acceptedAnswers) ? blank.acceptedAnswers.join(', ') : ''}
+                        onChange={(e) => {
+                          const answers = e.target.value.split(',').map(s => s.trim()).filter(s => s);
+                          const newBlanks = [...blanks];
+                          newBlanks[bIndex] = { ...newBlanks[bIndex], acceptedAnswers: answers };
+                          handleQuestionChange(qIndex, 'content.blanks', newBlanks);
+                        }}
+                        placeholder="e.g., 0, zero"
+                        className={`w-full px-3 py-2 rounded-lg border-2 text-sm font-medium ${
+                          isDark
+                            ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                            : 'bg-green-50 border-green-200 text-gray-900 placeholder-gray-400'
+                        }`}
+                      />
+                      {blank.acceptedAnswers && blank.acceptedAnswers.length > 0 && (
+                        <p className={`text-xs mt-1 ${isDark ? 'text-green-400' : 'text-green-600'}`}>
+                          ✓ Accepts: {blank.acceptedAnswers.map(ans => `"${ans}"`).join(', ')}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+
+      case 'fill_in_blank_drag_drop':
+        const dragDropBlanks = content?.blanks || [];
+        const wordBank = content?.wordBank || [];
+        return (
+          <div className="space-y-3">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className={`block text-sm font-semibold ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
+                  Blanks (Drag & Drop)
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newBlanks = [...(content?.blanks || []), {
+                      position: dragDropBlanks.length + 1,
+                      correctAnswer: ''
+                    }];
+                    handleQuestionChange(qIndex, 'content.blanks', newBlanks);
+                  }}
+                  className={`text-xs px-3 py-1 rounded-lg font-medium ${isDark ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'}`}
+                >
+                  + Add Blank
+                </button>
+              </div>
+              {dragDropBlanks.length === 0 ? (
+                <p className={`text-sm italic ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>No blanks defined</p>
+              ) : (
+                <div className="space-y-2">
+                  {dragDropBlanks.map((blank, bIndex) => (
+                    <div key={bIndex} className="flex gap-2">
+                      <input
+                        type="text"
+                        value={blank.correctAnswer || ''}
+                        onChange={(e) => {
+                          const newBlanks = [...dragDropBlanks];
+                          newBlanks[bIndex] = { ...newBlanks[bIndex], correctAnswer: e.target.value };
+                          handleQuestionChange(qIndex, 'content.blanks', newBlanks);
+                        }}
+                        placeholder={`Correct answer for position ${blank.position}`}
+                        className={`flex-1 px-3 py-2 rounded-lg border text-xs ${
+                          isDark
+                            ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                            : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newBlanks = dragDropBlanks.filter((_, i) => i !== bIndex);
+                          handleQuestionChange(qIndex, 'content.blanks', newBlanks);
+                        }}
+                        className="px-3 py-2 text-red-500 hover:text-red-700"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div>
+              <label className={`block text-sm font-semibold mb-2 ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
+                Word Bank (Comma separated)
+              </label>
+              <input
+                type="text"
+                value={Array.isArray(wordBank) ? wordBank.join(', ') : ''}
+                onChange={(e) => {
+                  const words = e.target.value.split(',').map(s => s.trim()).filter(s => s);
+                  handleQuestionChange(qIndex, 'content.wordBank', words);
+                }}
+                placeholder="e.g., >=, <=, ==, !="
+                className={`w-full px-4 py-3 rounded-lg border-2 text-sm ${
+                  isDark
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                    : 'bg-green-50 border-green-200 text-gray-900 placeholder-gray-400'
+                }`}
+              />
+            </div>
+          </div>
+        );
+
+      case 'ordering':
+        const correctOrder = content?.correctOrder || [];
+        const items = content?.items || [];
+        return (
+          <div>
+            <label className={`block text-sm font-semibold mb-2 ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
+              Correct Order (Comma separated IDs)
+            </label>
+            <input
+              type="text"
+              value={Array.isArray(correctOrder) ? correctOrder.join(', ') : ''}
+              onChange={(e) => {
+                const orderArray = e.target.value.split(',').map(s => s.trim()).filter(s => s);
+                handleQuestionChange(qIndex, 'content.correctOrder', orderArray);
+              }}
+              placeholder="e.g., 1, 2, 3, 4"
+              className={`w-full px-4 py-3 rounded-lg border-2 text-sm transition-colors ${
+                isDark
+                  ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-green-500'
+                  : 'bg-green-50 border-green-200 text-gray-900 placeholder-gray-400 focus:border-green-500'
+              }`}
+            />
+            {items.length > 0 && (
+              <div className={`mt-2 p-3 rounded-lg border ${isDark ? 'bg-gray-750 border-gray-600' : 'bg-blue-50 border-blue-200'}`}>
+                <p className={`text-xs font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Available Items:
+                </p>
+                <ol className={`text-sm space-y-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                  {items.map((item, idx) => (
+                    <li key={idx}>
+                      <span className="font-mono">{item.id}</span>: {item.text}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
+          </div>
+        );
+
+      case 'matching':
+        const correctPairs = content?.correctPairs || [];
+        return (
+          <div>
+            <label className={`block text-sm font-semibold mb-2 ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
+              Correct Pairs (Format: left_id:right_id, comma separated)
+            </label>
+            <input
+              type="text"
+              value={Array.isArray(correctPairs) ? correctPairs.map(p => `${p.left}:${p.right}`).join(', ') : ''}
+              onChange={(e) => {
+                const pairsArray = e.target.value.split(',').map(s => s.trim()).filter(s => s);
+                const pairsObjects = pairsArray.map(pair => {
+                  const [left, right] = pair.split(':').map(s => s.trim());
+                  return { left, right };
+                });
+                handleQuestionChange(qIndex, 'content.correctPairs', pairsObjects);
+              }}
+              placeholder="e.g., A:1, B:2, C:3"
+              className={`w-full px-4 py-3 rounded-lg border-2 text-sm transition-colors ${
+                isDark
+                  ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-green-500'
+                  : 'bg-green-50 border-green-200 text-gray-900 placeholder-gray-400 focus:border-green-500'
+              }`}
+            />
+            {correctPairs.length > 0 && (
+              <div className={`mt-2 p-3 rounded-lg border ${isDark ? 'bg-gray-750 border-gray-600' : 'bg-blue-50 border-blue-200'}`}>
+                <p className={`text-xs font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Current Pairs:
+                </p>
+                <ul className={`text-sm space-y-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                  {correctPairs.map((pair, idx) => (
+                    <li key={idx}>
+                      <span className="font-mono">{pair.left}</span> → <span className="font-mono">{pair.right}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  // Helper function to render content section (options, items, etc.) based on question type
+  const renderContentSection = (question, qIndex, isDark) => {
+    const { questionType, content } = question;
+
+    switch (questionType) {
+      case 'multiple_choice_single':
+      case 'multiple_choice_multi':
+        return content?.options && (
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <label className={`block text-sm font-semibold ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
+                Options
+              </label>
+              <button
+                type="button"
+                onClick={() => handleAddOption(qIndex)}
+                className={`text-xs px-3 py-2 rounded-lg font-medium transition-colors ${isDark ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+              >
+                + Add Option
+              </button>
+            </div>
+            <div className="space-y-2">
+              {content.options.map((option, oIndex) => (
+                <div key={oIndex} className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="ID (e.g., A)"
+                    value={option.id || ''}
+                    onChange={(e) => handleOptionChange(qIndex, oIndex, 'id', e.target.value)}
+                    className={`w-20 px-3 py-2 rounded-lg border text-sm font-mono ${
+                      isDark
+                        ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-500'
+                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+                    }`}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Option text"
+                    value={option.text || ''}
+                    onChange={(e) => handleOptionChange(qIndex, oIndex, 'text', e.target.value)}
+                    className={`flex-1 px-3 py-2 rounded-lg border text-sm ${
+                      isDark
+                        ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-500'
+                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveOption(qIndex, oIndex)}
+                    className={`px-3 py-2 rounded-lg text-sm transition-colors ${isDark ? 'bg-red-600/80 hover:bg-red-600 text-white' : 'bg-red-100 hover:bg-red-200 text-red-700'}`}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+
+      case 'ordering':
+        const items = content?.items || [];
+        return (
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <label className={`block text-sm font-semibold ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
+                Items to Order
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  const newItems = [...items, { id: `${items.length + 1}`, text: '' }];
+                  handleQuestionChange(qIndex, 'content.items', newItems);
+                }}
+                className={`text-xs px-3 py-2 rounded-lg font-medium transition-colors ${isDark ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+              >
+                + Add Item
+              </button>
+            </div>
+            {items.length === 0 ? (
+              <p className={`text-sm italic ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>No items defined</p>
+            ) : (
+              <div className={`p-4 rounded-lg border ${isDark ? 'bg-gray-750 border-gray-600' : 'bg-blue-50 border-blue-200'}`}>
+                <ol className="space-y-2">
+                  {items.map((item, iIndex) => (
+                    <li key={iIndex} className={`flex items-start gap-3 p-3 rounded-lg ${isDark ? 'bg-gray-700' : 'bg-white'}`}>
+                      <span className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${isDark ? 'bg-blue-600 text-white' : 'bg-blue-600 text-white'}`}>
+                        {item.id}
+                      </span>
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          placeholder="Item text"
+                          value={item.text || ''}
+                          onChange={(e) => {
+                            const newItems = [...items];
+                            newItems[iIndex] = { ...newItems[iIndex], text: e.target.value };
+                            handleQuestionChange(qIndex, 'content.items', newItems);
+                          }}
+                          className={`w-full px-3 py-2 rounded-lg border text-sm ${
+                            isDark
+                              ? 'bg-gray-600 border-gray-500 text-white placeholder-gray-400'
+                              : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400'
+                          }`}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newItems = items.filter((_, i) => i !== iIndex);
+                          handleQuestionChange(qIndex, 'content.items', newItems);
+                        }}
+                        className={`flex-shrink-0 px-2 py-2 rounded-lg text-sm transition-colors ${isDark ? 'bg-red-600/80 hover:bg-red-600 text-white' : 'bg-red-100 hover:bg-red-200 text-red-700'}`}
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
+          </div>
+        );
+
+      case 'matching':
+        const leftItems = content?.leftItems || [];
+        const rightItems = content?.rightItems || [];
+        return (
+          <div className="space-y-4">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <label className={`block text-sm font-semibold ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
+                  Left Items
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newLeftItems = [...leftItems, { id: '', text: '' }];
+                    handleQuestionChange(qIndex, 'content.leftItems', newLeftItems);
+                  }}
+                  className={`text-xs px-3 py-2 rounded-lg font-medium transition-colors ${isDark ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+                >
+                  + Add Left Item
+                </button>
+              </div>
+              {leftItems.length === 0 ? (
+                <p className={`text-sm italic ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>No left items</p>
+              ) : (
+                <div className="space-y-2">
+                  {leftItems.map((item, iIndex) => (
+                    <div key={iIndex} className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="ID"
+                        value={item.id || ''}
+                        onChange={(e) => {
+                          const newLeftItems = [...leftItems];
+                          newLeftItems[iIndex] = { ...newLeftItems[iIndex], id: e.target.value };
+                          handleQuestionChange(qIndex, 'content.leftItems', newLeftItems);
+                        }}
+                        className={`w-20 px-3 py-2 rounded-lg border text-sm font-mono ${
+                          isDark
+                            ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-500'
+                            : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+                        }`}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Text"
+                        value={item.text || ''}
+                        onChange={(e) => {
+                          const newLeftItems = [...leftItems];
+                          newLeftItems[iIndex] = { ...newLeftItems[iIndex], text: e.target.value };
+                          handleQuestionChange(qIndex, 'content.leftItems', newLeftItems);
+                        }}
+                        className={`flex-1 px-3 py-2 rounded-lg border text-sm ${
+                          isDark
+                            ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-500'
+                            : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newLeftItems = leftItems.filter((_, i) => i !== iIndex);
+                          handleQuestionChange(qIndex, 'content.leftItems', newLeftItems);
+                        }}
+                        className={`px-3 py-2 rounded-lg text-sm transition-colors ${isDark ? 'bg-red-600/80 hover:bg-red-600 text-white' : 'bg-red-100 hover:bg-red-200 text-red-700'}`}
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <label className={`block text-sm font-semibold ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
+                  Right Items
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newRightItems = [...rightItems, { id: '', text: '' }];
+                    handleQuestionChange(qIndex, 'content.rightItems', newRightItems);
+                  }}
+                  className={`text-xs px-3 py-2 rounded-lg font-medium transition-colors ${isDark ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+                >
+                  + Add Right Item
+                </button>
+              </div>
+              {rightItems.length === 0 ? (
+                <p className={`text-sm italic ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>No right items</p>
+              ) : (
+                <div className="space-y-2">
+                  {rightItems.map((item, iIndex) => (
+                    <div key={iIndex} className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="ID"
+                        value={item.id || ''}
+                        onChange={(e) => {
+                          const newRightItems = [...rightItems];
+                          newRightItems[iIndex] = { ...newRightItems[iIndex], id: e.target.value };
+                          handleQuestionChange(qIndex, 'content.rightItems', newRightItems);
+                        }}
+                        className={`w-20 px-3 py-2 rounded-lg border text-sm font-mono ${
+                          isDark
+                            ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-500'
+                            : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+                        }`}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Text"
+                        value={item.text || ''}
+                        onChange={(e) => {
+                          const newRightItems = [...rightItems];
+                          newRightItems[iIndex] = { ...newRightItems[iIndex], text: e.target.value };
+                          handleQuestionChange(qIndex, 'content.rightItems', newRightItems);
+                        }}
+                        className={`flex-1 px-3 py-2 rounded-lg border text-sm ${
+                          isDark
+                            ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-500'
+                            : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newRightItems = rightItems.filter((_, i) => i !== iIndex);
+                          handleQuestionChange(qIndex, 'content.rightItems', newRightItems);
+                        }}
+                        className={`px-3 py-2 rounded-lg text-sm transition-colors ${isDark ? 'bg-red-600/80 hover:bg-red-600 text-white' : 'bg-red-100 hover:bg-red-200 text-red-700'}`}
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+
+      case 'fill_in_blank':
+        return null; // Template is already in questionText, no additional content needed
+
+      case 'fill_in_blank_drag_drop':
+        return null; // Template is already in questionText, no additional content needed
+
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="p-8 max-w-4xl mx-auto">
       {/* Header */}
@@ -672,15 +1284,15 @@ const CreatorCreateQuiz = ({ isDark }) => {
 
             {/* Parsed Questions Editor */}
             {editMode && parsedQuestions.length > 0 && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+              <div className="space-y-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
                     Edit Questions ({parsedQuestions.length})
                   </h3>
                   <button
                     type="button"
                     onClick={() => setEditMode(false)}
-                    className={`text-sm px-3 py-1 rounded-lg ${isDark ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`}
+                    className={`text-sm px-4 py-2 rounded-lg font-medium transition-colors ${isDark ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`}
                   >
                     Hide Editor
                   </button>
@@ -689,49 +1301,76 @@ const CreatorCreateQuiz = ({ isDark }) => {
                 {parsedQuestions.map((question, qIndex) => (
                   <div
                     key={qIndex}
-                    className={`p-6 rounded-lg border ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}`}
+                    className={`p-6 rounded-xl border-2 shadow-sm ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}
                   >
-                    <div className="space-y-4">
+                    <div className="space-y-5">
                       {/* Question Header */}
-                      <div className="flex items-start justify-between">
-                        <h4 className={`font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                          Question {qIndex + 1}
-                        </h4>
-                        <span className={`text-xs px-2 py-1 rounded ${isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-600'}`}>
-                          {question.questionType}
-                        </span>
+                      <div className="flex items-center justify-between pb-4 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}">
+                        <div className="flex items-center gap-3">
+                          <span className={`text-lg font-bold ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>
+                            Question {qIndex + 1}
+                          </span>
+                          <span className={`text-xs px-3 py-1 rounded-full font-medium ${isDark ? 'bg-purple-900/40 text-purple-300 border border-purple-700' : 'bg-purple-100 text-purple-700 border border-purple-300'}`}>
+                            {question.questionType.replace(/_/g, ' ').toUpperCase()}
+                          </span>
+                        </div>
                       </div>
 
                       {/* Question Text */}
                       <div>
-                        <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        <label className={`block text-sm font-semibold mb-2 ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
                           Question Text
                         </label>
                         <textarea
                           value={question.questionText || ''}
                           onChange={(e) => handleQuestionChange(qIndex, 'questionText', e.target.value)}
-                          rows={2}
-                          className={`w-full px-3 py-2 rounded-lg border text-sm ${
+                          rows={question.questionType === 'ordering' ? 8 : question.questionType === 'fill_in_blank' || question.questionType === 'fill_in_blank_drag_drop' ? 3 : 4}
+                          className={`w-full px-4 py-3 rounded-lg border-2 text-sm font-mono transition-colors ${
                             isDark
-                              ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
-                              : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+                              ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500'
+                              : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-blue-500'
                           }`}
+                          style={{ whiteSpace: 'pre-wrap' }}
                         />
                       </div>
 
-                      {/* Question Metadata */}
-                      <div className="grid grid-cols-3 gap-4">
+                      {/* Template Field for Fill-in-Blank Questions */}
+                      {(question.questionType === 'fill_in_blank' || question.questionType === 'fill_in_blank_drag_drop') && (
                         <div>
-                          <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                          <label className={`block text-sm font-semibold mb-2 ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
+                            Template (Code block and blanks format)
+                          </label>
+                          <textarea
+                            value={question.content?.template || ''}
+                            onChange={(e) => handleQuestionChange(qIndex, 'content.template', e.target.value)}
+                            rows={8}
+                            placeholder="```python\ncode here\n```\n\nOutput: ___ ___"
+                            className={`w-full px-4 py-3 rounded-lg border-2 text-sm font-mono transition-colors ${
+                              isDark
+                                ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500'
+                                : 'bg-blue-50 border-blue-200 text-gray-900 placeholder-gray-400 focus:border-blue-500'
+                            }`}
+                            style={{ whiteSpace: 'pre-wrap' }}
+                          />
+                          <p className={`text-xs mt-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                            Use backticks for code blocks and _____ for blanks
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Question Metadata */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className={`block text-sm font-semibold mb-2 ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
                             Difficulty
                           </label>
                           <select
                             value={question.difficulty || 'medium'}
                             onChange={(e) => handleQuestionChange(qIndex, 'difficulty', e.target.value)}
-                            className={`w-full px-3 py-2 rounded-lg border text-sm ${
+                            className={`w-full px-4 py-3 rounded-lg border-2 text-sm transition-colors ${
                               isDark
-                                ? 'bg-gray-700 border-gray-600 text-white'
-                                : 'bg-white border-gray-300 text-gray-900'
+                                ? 'bg-gray-700 border-gray-600 text-white focus:border-blue-500'
+                                : 'bg-gray-50 border-gray-200 text-gray-900 focus:border-blue-500'
                             }`}
                           >
                             <option value="easy">Easy</option>
@@ -740,89 +1379,27 @@ const CreatorCreateQuiz = ({ isDark }) => {
                           </select>
                         </div>
                         <div>
-                          <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                          <label className={`block text-sm font-semibold mb-2 ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
                             Points
                           </label>
                           <input
                             type="number"
                             value={question.points || 10}
                             onChange={(e) => handleQuestionChange(qIndex, 'points', parseInt(e.target.value) || 0)}
-                            className={`w-full px-3 py-2 rounded-lg border text-sm ${
+                            className={`w-full px-4 py-3 rounded-lg border-2 text-sm transition-colors ${
                               isDark
-                                ? 'bg-gray-700 border-gray-600 text-white'
-                                : 'bg-white border-gray-300 text-gray-900'
-                            }`}
-                          />
-                        </div>
-                        <div>
-                          <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                            Correct Answer
-                          </label>
-                          <input
-                            type="text"
-                            value={question.content?.correctAnswer || ''}
-                            onChange={(e) => handleQuestionChange(qIndex, 'content.correctAnswer', e.target.value)}
-                            className={`w-full px-3 py-2 rounded-lg border text-sm ${
-                              isDark
-                                ? 'bg-gray-700 border-gray-600 text-white'
-                                : 'bg-white border-gray-300 text-gray-900'
+                                ? 'bg-gray-700 border-gray-600 text-white focus:border-blue-500'
+                                : 'bg-gray-50 border-gray-200 text-gray-900 focus:border-blue-500'
                             }`}
                           />
                         </div>
                       </div>
 
-                      {/* Options */}
-                      {question.content?.options && (
-                        <div>
-                          <div className="flex items-center justify-between mb-2">
-                            <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                              Options
-                            </label>
-                            <button
-                              type="button"
-                              onClick={() => handleAddOption(qIndex)}
-                              className={`text-xs px-2 py-1 rounded ${isDark ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'}`}
-                            >
-                              + Add Option
-                            </button>
-                          </div>
-                          <div className="space-y-2">
-                            {question.content.options.map((option, oIndex) => (
-                              <div key={oIndex} className="flex gap-2">
-                                <input
-                                  type="text"
-                                  placeholder="ID"
-                                  value={option.id || ''}
-                                  onChange={(e) => handleOptionChange(qIndex, oIndex, 'id', e.target.value)}
-                                  className={`flex-1 px-3 py-2 rounded-lg border text-sm ${
-                                    isDark
-                                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-500'
-                                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
-                                  }`}
-                                />
-                                <input
-                                  type="text"
-                                  placeholder="Text"
-                                  value={option.text || ''}
-                                  onChange={(e) => handleOptionChange(qIndex, oIndex, 'text', e.target.value)}
-                                  className={`flex-1 px-3 py-2 rounded-lg border text-sm ${
-                                    isDark
-                                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-500'
-                                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
-                                  }`}
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveOption(qIndex, oIndex)}
-                                  className={`px-3 py-2 rounded-lg text-sm ${isDark ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-600 hover:bg-red-700 text-white'}`}
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                      {/* Correct Answer Section - Different rendering based on question type */}
+                      {renderCorrectAnswerSection(question, qIndex, isDark)}
+
+                      {/* Content Section - Different rendering based on question type */}
+                      {renderContentSection(question, qIndex, isDark)}
                     </div>
                   </div>
                 ))}

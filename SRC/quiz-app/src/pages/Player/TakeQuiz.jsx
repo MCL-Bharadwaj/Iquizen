@@ -380,13 +380,22 @@ const TakeQuiz = ({ isDark }) => {
         throw new Error('No attempt ID available');
       }
 
-      // Submit any remaining answers
-      const currentQuestion = questions[currentQuestionIndex];
-      const answerData = answers[currentQuestion.questionId];
-      if (answerData) {
-        console.log('[handleSubmitQuiz] Submitting final answer for question:', currentQuestion.questionId);
-        await submitAnswer(currentQuestion.questionId, answerData, currentQuestion.points);
+      // Save ALL questions before submitting - both answered and unanswered
+      console.log('[handleSubmitQuiz] Saving all questions before submission...');
+      for (const question of questions) {
+        const answerData = answers[question.questionId];
+        
+        if (answerData) {
+          // Submit answered questions
+          console.log('[handleSubmitQuiz] Submitting answer for question:', question.questionId);
+          await submitAnswer(question.questionId, answerData, question.points);
+        } else {
+          // Submit empty/skipped answers for unanswered questions
+          console.log('[handleSubmitQuiz] Submitting skipped answer for question:', question.questionId);
+          await submitSkippedAnswer(question.questionId, question.points);
+        }
       }
+      console.log('[handleSubmitQuiz] ✓ All questions saved');
 
       // Complete attempt
       console.log('[handleSubmitQuiz] Calling completeAttempt for:', currentAttemptId);
@@ -528,17 +537,15 @@ const TakeQuiz = ({ isDark }) => {
                       className={`
                         flex-shrink-0 w-12 h-12 rounded-lg font-semibold text-sm transition-all duration-200
                         ${isCurrent 
-                          ? 'border-2 border-blue-500 shadow-lg' 
-                          : ''
-                        }
-                        ${isAnswered
+                          ? 'bg-green-500 text-white hover:bg-green-600 shadow-lg' 
+                          : isAnswered
                           ? 'bg-orange-500 text-white hover:bg-orange-600'
                           : isDark
                           ? 'bg-gray-800 text-white border-2 border-gray-600 hover:bg-gray-700'
                           : 'bg-white text-gray-900 border-2 border-gray-300 hover:bg-gray-50'
                         }
                       `}
-                      title={`Question ${index + 1}${isAnswered ? ' (answered)' : ' (unanswered)'}`}
+                      title={`Question ${index + 1}${isCurrent ? ' (current)' : isAnswered ? ' (answered)' : ' (unanswered)'}`}
                     >
                       {index + 1}
                     </button>

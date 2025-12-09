@@ -328,8 +328,10 @@ const QuestionReviewCard = ({ question, response, index, isDark }) => {
         );
 
       case 'fill_in_blank_drag_drop':
-        const blanksData = question.content.blanks || [];
-        const wordBankForDisplay = question.content.wordBank || question.content.word_bank || [];
+        // Handle nested content structure for drag_drop questions
+        const nestedContentForDisplay = question.content.content || question.content;
+        const blanksData = nestedContentForDisplay.blanks || [];
+        const wordBankForDisplay = nestedContentForDisplay.wordBank || nestedContentForDisplay.word_bank || [];
         
         // Handle multiple answer formats
         let selectedItemsMap = {};
@@ -338,7 +340,11 @@ const QuestionReviewCard = ({ question, response, index, isDark }) => {
           // New format: Simple array ["gte", "lte"] - matches fill_in_blank format
           PlayerAnswer.forEach((answerId, idx) => {
             if (answerId) {
-              const wordItem = wordBankForDisplay.find(w => w.id === answerId);
+              const wordItem = wordBankForDisplay.find(w => 
+                w.id === answerId || 
+                w.value === answerId || 
+                w.label === answerId
+              );
               if (wordItem) {
                 selectedItemsMap[idx] = wordItem;
               }
@@ -350,7 +356,11 @@ const QuestionReviewCard = ({ question, response, index, isDark }) => {
         } else if (PlayerAnswer?.blanks) {
           // Old format: { blanks: [{position: 1, selected_id: "add_assign"}] }
           PlayerAnswer.blanks.forEach(blank => {
-            const wordItem = wordBankForDisplay.find(w => w.id === blank.selected_id);
+            const wordItem = wordBankForDisplay.find(w => 
+              w.id === blank.selected_id || 
+              w.value === blank.selected_id ||
+              w.label === blank.selected_id
+            );
             if (wordItem) {
               selectedItemsMap[blank.position] = wordItem;
             }
@@ -369,7 +379,7 @@ const QuestionReviewCard = ({ question, response, index, isDark }) => {
                         Blank {blank.position + 1}:
                       </span>
                       <span className={`ml-2 px-3 py-1 rounded ${isDark ? 'bg-purple-900/30 text-purple-300' : 'bg-purple-100 text-purple-700'}`}>
-                        {selectedItem?.text || '(empty)'}
+                        {selectedItem?.label || selectedItem?.text || '(empty)'}
                       </span>
                       {blank.hint && (
                         <span className={`ml-2 text-sm italic ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
@@ -447,7 +457,8 @@ const QuestionReviewCard = ({ question, response, index, isDark }) => {
 
       case 'ordering':
         const orderItems = question.content.items || [];
-        const order = PlayerAnswer?.order || [];
+        // Handle both formats: array of IDs directly, or object with order property
+        const order = Array.isArray(PlayerAnswer) ? PlayerAnswer : (PlayerAnswer?.order || []);
         const correctOrder = question.content.correctOrder || question.content.correct_order || [];
         
         return (
@@ -560,18 +571,25 @@ const QuestionReviewCard = ({ question, response, index, isDark }) => {
         );
 
       case 'fill_in_blank_drag_drop':
-        const dragDropBlanks = question.content.blanks || [];
-        const wordBank = question.content.wordBank || question.content.word_bank || [];
+        // Handle nested content structure for drag_drop questions
+        const nestedContent = question.content.content || question.content;
+        const dragDropBlanks = nestedContent.blanks || [];
+        const wordBank = nestedContent.wordBank || nestedContent.word_bank || [];
         
         return (
           <div className={`p-4 rounded-xl ${isDark ? 'bg-green-900/20 border-green-700' : 'bg-green-50 border-green-200'} border`}>
             <div className="space-y-2">
               {dragDropBlanks.map((blank, idx) => {
                 // Get correct answer from accepted_answers array or correctAnswer field
-                const correctAnswerId = blank.correctAnswer || 
-                                       (blank.accepted_answers && blank.accepted_answers[0]) ||
-                                       (blank.acceptedAnswers && blank.acceptedAnswers[0]);
-                const correctWord = wordBank.find(word => word.id === correctAnswerId);
+                const correctAnswerIds = blank.accepted_answers || blank.acceptedAnswers || [];
+                const correctAnswerId = blank.correctAnswer || correctAnswerIds[0];
+                
+                // Find the word from word bank by matching value or id
+                const correctWord = wordBank.find(word => 
+                  word.id === correctAnswerId || 
+                  word.value === correctAnswerId ||
+                  word.label === correctAnswerId
+                );
                 
                 return (
                   <div key={idx}>
@@ -579,7 +597,7 @@ const QuestionReviewCard = ({ question, response, index, isDark }) => {
                       Blank {blank.position + 1}:
                     </span>
                     <span className={`ml-2 px-3 py-1 rounded ${isDark ? 'bg-green-900/40 text-green-300' : 'bg-green-100 text-green-800'}`}>
-                      {correctWord?.text || correctAnswerId || 'No answer specified'}
+                      {correctWord?.label || correctWord?.text || correctAnswerId || 'No answer specified'}
                     </span>
                     {blank.hint && (
                       <span className={`ml-2 text-sm italic ${isDark ? 'text-green-600' : 'text-green-600'}`}>
