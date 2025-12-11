@@ -19,13 +19,18 @@ function ProtectedRoute({ children, requiredRole }) {
     return <Navigate to="/login" replace />;
   }
 
-  // Check role if required
-  if (requiredRole && user?.role !== requiredRole) {
-    // Redirect based on actual role
-    if (user?.role === 'Player' || user?.role === 'admin') {
-      return <Navigate to="/Player/dashboard" replace />;
+  // Check role if required (supports both single role string and array of roles)
+  if (requiredRole) {
+    const userRoles = user?.roles || [];
+    const hasRequiredRole = Array.isArray(requiredRole)
+      ? requiredRole.some(role => userRoles.includes(role))
+      : userRoles.includes(requiredRole);
+
+    if (!hasRequiredRole) {
+      console.log('ProtectedRoute - Access denied. Required:', requiredRole, 'User has:', userRoles);
+      // Redirect to role selector to choose appropriate dashboard
+      return <Navigate to="/role-selector" replace />;
     }
-    return <Navigate to="/login" replace />;
   }
 
   return children;

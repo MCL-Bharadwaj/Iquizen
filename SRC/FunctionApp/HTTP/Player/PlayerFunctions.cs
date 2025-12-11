@@ -36,10 +36,10 @@ public class PlayerFunctions
     /// <summary>
     /// Get all players
     /// GET /api/players
-    /// Requires: Administrator role
+    /// Requires: Administrator, Tutors, or ContentCreator role
     /// </summary>
     [Function("GetAllPlayers")]
-    [OpenApiOperation(operationId: "GetAllPlayers", tags: new[] { "players" }, Summary = "Get all players", Description = "Get paginated list of all players (Admin only)")]
+    [OpenApiOperation(operationId: "GetAllPlayers", tags: new[] { "players" }, Summary = "Get all players", Description = "Get paginated list of all players (Admin, Tutors, ContentCreator)")]
     [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = "JWT")]
     [OpenApiParameter(name: "page", In = ParameterLocation.Query, Required = false, Type = typeof(int), Description = "Page number (default: 1)")]
     [OpenApiParameter(name: "pageSize", In = ParameterLocation.Query, Required = false, Type = typeof(int), Description = "Page size (default: 20)")]
@@ -52,8 +52,8 @@ public class PlayerFunctions
 
         try
         {
-            // Validate token and authorize (Administrator only)
-            var authResult = await _authService.ValidateAndAuthorizeAsync(req, "Administrator");
+            // Validate token and authorize (Administrator, Tutors, ContentCreator)
+            var authResult = await _authService.ValidateAndAuthorizeAsync(req, "Administrator", "Tutors", "ContentCreator");
             if (!authResult.IsAuthorized)
                 return authResult.ErrorResponse!;
 

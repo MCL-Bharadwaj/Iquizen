@@ -14,6 +14,7 @@ const AuthLayout = ({ children, isDark, toggleTheme, title, subtitle }) => {
             <div className="text-white">
               <h1 className="text-2xl font-bold">IQuizen</h1>
               <p className="text-sm opacity-90">Learn. Play. Master.</p>
+              <p className="text-xs opacity-70 mt-1 font-medium tracking-wide">Powered by MathCodeLab</p>
             </div>
           </Link>
         </div>

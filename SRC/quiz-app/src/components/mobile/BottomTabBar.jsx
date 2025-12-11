@@ -14,6 +14,10 @@ const BottomTabBar = ({ isDark, role, onProfileClick }) => {
       { icon: BookOpen, label: 'Quizzes', path: '/Player/quizzes' },
       { icon: ClipboardList, label: 'Attempts', path: '/Player/attempts' },
     ],
+    tutor: [
+      { icon: Home, label: 'Dashboard', path: '/tutor/dashboard' },
+      { icon: ClipboardList, label: 'Assignments', path: '/tutor/assignments' },
+    ],
     creator: [
       { icon: Home, label: 'Dashboard', path: '/creator/dashboard' },
       { icon: BookOpen, label: 'Quizzes', path: '/creator/quizzes' },

@@ -1,5 +1,5 @@
 import { useLocation } from 'react-router-dom';
-import { GraduationCap, PenTool } from 'lucide-react';
+import { GraduationCap, PenTool, UserCheck } from 'lucide-react';
 
 /**
  * MobileTopBar - Simple header for mobile view
@@ -14,6 +14,11 @@ const MobileTopBar = ({ isDark, role }) => {
       title: 'Player Portal',
       gradient: 'from-blue-500 to-cyan-600',
     },
+    tutor: {
+      icon: UserCheck,
+      title: 'Tutor Portal',
+      gradient: 'from-green-500 to-teal-600',
+    },
     creator: {
       icon: PenTool,
       title: 'Content Creator',
@@ -25,6 +30,8 @@ const MobileTopBar = ({ isDark, role }) => {
     '/Player/dashboard': 'Dashboard',
     '/Player/quizzes': 'My Quizzes',
     '/Player/attempts': 'My Attempts',
+    '/tutor/dashboard': 'Dashboard',
+    '/tutor/assignments': 'My Assignments',
     '/creator/dashboard': 'Dashboard',
     '/creator/quizzes': 'All Quizzes',
     '/creator/quiz/create': 'Create Quiz',

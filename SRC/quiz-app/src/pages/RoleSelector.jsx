@@ -21,6 +21,16 @@ const RoleSelector = ({ isDark, toggleTheme }) => {
       requiredRole: ['Player', 'Administrator'],
     },
     {
+      id: 'tutor',
+      title: 'Tutor',
+      description: 'View assigned quizzes, monitor student progress, and track assignments',
+      icon: UserCheck,
+      path: '/tutor/dashboard',
+      gradient: 'from-green-500 to-teal-600',
+      bgGradient: isDark ? 'from-green-950/50 to-teal-950/50' : 'from-green-50 to-teal-50',
+      requiredRole: ['Tutors', 'Administrator'],
+    },
+    {
       id: 'creator',
       title: 'Content Creator',
       description: 'Create and manage quizzes, add questions, and organize content',
@@ -28,7 +38,7 @@ const RoleSelector = ({ isDark, toggleTheme }) => {
       path: '/creator/dashboard',
       gradient: 'from-purple-500 to-pink-600',
       bgGradient: isDark ? 'from-purple-950/50 to-pink-950/50' : 'from-purple-50 to-pink-50',
-      requiredRole: ['Tutors', 'Administrator'],
+      requiredRole: ['ContentCreator', 'Administrator'],
     },
   ];
 
@@ -36,25 +46,43 @@ const RoleSelector = ({ isDark, toggleTheme }) => {
   useEffect(() => {
     if (user && user.roles) {
       const userRoles = user.roles; // Array of roles from decoded JWT
-      console.log('User roles from token:', userRoles);
+      console.log('RoleSelector - User roles from token:', userRoles);
+      console.log('RoleSelector - Full user object:', user);
 
       const filtered = allRoles.filter((role) => {
         if (Array.isArray(role.requiredRole)) {
           // Check if user has any of the required roles
-          return role.requiredRole.some((reqRole) => userRoles.includes(reqRole));
+          const hasMatch = role.requiredRole.some((reqRole) => userRoles.includes(reqRole));
+          console.log(`RoleSelector - Checking ${role.title}:`, {
+            requiredRoles: role.requiredRole,
+            userRoles: userRoles,
+            hasMatch: hasMatch
+          });
+          return hasMatch;
         } else {
           // Check if user has the single required role
-          return userRoles.includes(role.requiredRole);
+          const hasMatch = userRoles.includes(role.requiredRole);
+          console.log(`RoleSelector - Checking ${role.title}:`, {
+            requiredRole: role.requiredRole,
+            userRoles: userRoles,
+            hasMatch: hasMatch
+          });
+          return hasMatch;
         }
       });
 
       setAvailableRoles(filtered);
-      console.log('Available roles for user:', filtered.map(r => r.title));
+      console.log('RoleSelector - Available roles for user:', filtered.map(r => r.title));
+      console.log('RoleSelector - Number of available roles:', filtered.length);
 
       // Auto-navigate if user has only one available role
       if (filtered.length === 1) {
-        console.log('Single role detected, auto-navigating to:', filtered[0].path);
+        console.log('RoleSelector - Single role detected, auto-navigating to:', filtered[0].path);
         navigate(filtered[0].path, { replace: true });
+      } else if (filtered.length > 1) {
+        console.log('RoleSelector - Multiple roles available, showing selector');
+      } else {
+        console.log('RoleSelector - No roles available for user');
       }
     }
   }, [user, navigate, isDark]);
@@ -85,7 +113,7 @@ const RoleSelector = ({ isDark, toggleTheme }) => {
         </div>
 
         {/* Role Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {roles.map((role) => {
             const Icon = role.icon;
             return (

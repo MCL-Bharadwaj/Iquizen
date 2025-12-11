@@ -33,6 +33,10 @@ const Sidebar = ({ isDark, toggleTheme, role = 'Player' }) => {
       { icon: BookOpen, label: 'My Quizzes', path: '/Player/quizzes' },
       { icon: ClipboardList, label: 'My Attempts', path: '/Player/attempts' },
     ],
+    tutor: [
+      { icon: Home, label: 'Dashboard', path: '/tutor/dashboard' },
+      { icon: ClipboardList, label: 'My Assignments', path: '/tutor/assignments' },
+    ],
     creator: [
       { icon: Home, label: 'Dashboard', path: '/creator/dashboard' },
       { icon: BookOpen, label: 'Quizzes', path: '/creator/quizzes' },
@@ -47,6 +51,12 @@ const Sidebar = ({ isDark, toggleTheme, role = 'Player' }) => {
       title: 'Player Portal',
       subtitle: 'Learning Dashboard',
       gradient: 'from-blue-500 to-cyan-600',
+    },
+    tutor: {
+      icon: UserCheck,
+      title: 'Tutor Portal',
+      subtitle: 'Assignment Tracking',
+      gradient: 'from-green-500 to-teal-600',
     },
     creator: {
       icon: PenTool,

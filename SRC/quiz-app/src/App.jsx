@@ -27,6 +27,10 @@ import CreatorAssignments from './pages/ContentCreator/CreatorAssignments';
 import AssignmentResponsesView from './pages/ContentCreator/AssignmentResponsesView';
 import EditAssignment from './pages/ContentCreator/EditAssignment';
 
+// Tutor Pages
+import TutorDashboard from './pages/Tutor/TutorDashboard';
+import TutorAssignments from './pages/Tutor/TutorAssignments';
+
 // Questions Page
 import Questions from './pages/Questions';
 
@@ -75,7 +79,7 @@ function App() {
 
           {/* Player ROUTES (Protected) */}
           <Route path="/Player/*" element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRole={['Player', 'Administrator']}>
               <div className={isDark ? 'bg-gray-950' : 'bg-gray-50'}>
                 <ResponsiveLayout isDark={isDark} toggleTheme={toggleTheme} role="Player">
                   <Routes>
@@ -94,7 +98,7 @@ function App() {
 
           {/* Content Creator ROUTES (Protected) */}
           <Route path="/creator/*" element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRole={['ContentCreator', 'Administrator']}>
               <div className={isDark ? 'bg-gray-950' : 'bg-gray-50'}>
                 <ResponsiveLayout isDark={isDark} toggleTheme={toggleTheme} role="creator">
                   <Routes>
@@ -107,6 +111,23 @@ function App() {
                     <Route path="/quiz/create" element={<CreatorCreateQuiz isDark={isDark} />} />
                     <Route path="/quiz/:quizId/questions" element={<CreatorManageQuestions isDark={isDark} />} />
                     <Route path="/questions" element={<Questions isDark={isDark} />} />
+                  </Routes>
+                </ResponsiveLayout>
+              </div>
+            </ProtectedRoute>
+          } />
+
+          {/* Tutor ROUTES (Protected) */}
+          <Route path="/tutor/*" element={
+            <ProtectedRoute requiredRole={['Tutors', 'Administrator']}>
+              <div className={isDark ? 'bg-gray-950' : 'bg-gray-50'}>
+                <ResponsiveLayout isDark={isDark} toggleTheme={toggleTheme} role="tutor">
+                  <Routes>
+                    <Route path="/" element={<Navigate to="/tutor/dashboard" replace />} />
+                    <Route path="/dashboard" element={<TutorDashboard isDark={isDark} />} />
+                    <Route path="/assignments" element={<TutorAssignments isDark={isDark} />} />
+                    <Route path="/assignments/:assignmentId" element={<AssignmentResponsesView isDark={isDark} />} />
+                    <Route path="/assignments/:assignmentId/edit" element={<EditAssignment isDark={isDark} />} />
                   </Routes>
                 </ResponsiveLayout>
               </div>
