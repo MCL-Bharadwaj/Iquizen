@@ -2,6 +2,39 @@ import { useState, useEffect, useRef } from 'react';
 import { Check } from 'lucide-react';
 
 const MatchingQuestion = ({ question, answer, onChange, isDark }) => {
+  // Helper function to detect and render code snippets with proper formatting
+  const renderText = (text) => {
+    // Check if text looks like code (contains common code patterns)
+    const codePatterns = [
+      /for\s+\w+\s+in\s+/,           // for loops
+      /while\s+/,                     // while loops
+      /if\s+\w+\s*[=<>!]+/,          // if statements
+      /def\s+\w+\s*\(/,              // Python functions
+      /print\s*\(/,                   // print statements
+      /range\s*\(/,                   // range function
+      /\(.*\)/,                       // function calls
+    ];
+    
+    const looksLikeCode = codePatterns.some(pattern => pattern.test(text));
+    
+    if (looksLikeCode) {
+      // Split by common separators while preserving line structure
+      // Replace : with :\n for Python-style blocks
+      const formattedCode = text
+        .replace(/:\s+/g, ':\n    ')  // Add newline and indent after colons
+        .trim();
+      
+      return (
+        <code className={`block px-3 py-2 rounded-lg font-mono text-sm whitespace-pre-wrap ${
+          isDark ? 'bg-gray-900/50 text-blue-300' : 'bg-gray-100 text-blue-700'
+        }`}>
+          {formattedCode}
+        </code>
+      );
+    }
+    
+    return <span>{text}</span>;
+  };
   const leftItems = question.content.leftItems || question.content.left_items || [];
   const rightItemsOriginal = question.content.rightItems || question.content.right_items || [];
   const prevQuestionIdRef = useRef(null);
@@ -35,6 +68,7 @@ const MatchingQuestion = ({ question, answer, onChange, isDark }) => {
 
   const [selectedLeft, setSelectedLeft] = useState(null);
   const [hoveredRight, setHoveredRight] = useState(null);
+  const [hasInteracted, setHasInteracted] = useState(false);
   const svgRef = useRef(null);
   const leftRefs = useRef({});
   const rightRefs = useRef({});
@@ -44,6 +78,7 @@ const MatchingQuestion = ({ question, answer, onChange, isDark }) => {
     // Only reset if question actually changed
     if (prevQuestionIdRef.current !== question.questionId) {
       prevQuestionIdRef.current = question.questionId;
+      setHasInteracted(false);
       
       // Shuffle right items for new question
       setRightItems(shuffleArray([...rightItemsOriginal]));
@@ -62,14 +97,16 @@ const MatchingQuestion = ({ question, answer, onChange, isDark }) => {
     }
   }, [question.questionId, answer]);
 
-  // Update parent when pairs change
+  // Update parent when pairs change (only after user interaction)
   useEffect(() => {
-    const pairArray = Object.entries(pairs).map(([left, right]) => ({
-      left,
-      right
-    }));
-    onChange({ pairs: pairArray }, null);
-  }, [pairs]);
+    if (hasInteracted) {
+      const pairArray = Object.entries(pairs).map(([left, right]) => ({
+        left,
+        right
+      }));
+      onChange({ pairs: pairArray }, null);
+    }
+  }, [pairs, hasInteracted]);
 
   const handleLeftClick = (leftId) => {
     if (selectedLeft === leftId) {
@@ -81,6 +118,7 @@ const MatchingQuestion = ({ question, answer, onChange, isDark }) => {
 
   const handleRightClick = (rightId) => {
     if (selectedLeft) {
+      setHasInteracted(true);
       setPairs(prev => ({
         ...prev,
         [selectedLeft]: rightId
@@ -90,6 +128,7 @@ const MatchingQuestion = ({ question, answer, onChange, isDark }) => {
   };
 
   const handleClearPair = (leftId) => {
+    setHasInteracted(true);
     setPairs(prev => {
       const newPairs = { ...prev };
       delete newPairs[leftId];
@@ -205,10 +244,10 @@ const MatchingQuestion = ({ question, answer, onChange, isDark }) => {
                       }
                     `}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-3 flex-1">
                         <span className={`
-                          font-bold text-lg
+                          font-bold text-lg flex-shrink-0 mt-1
                           ${isMatched
                             ? isDark ? 'text-green-400' : 'text-green-600'
                             : isDark ? 'text-blue-400' : 'text-blue-600'
@@ -216,9 +255,9 @@ const MatchingQuestion = ({ question, answer, onChange, isDark }) => {
                         `}>
                           {String.fromCharCode(65 + index)}.
                         </span>
-                        <span className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                          {item.text}
-                        </span>
+                        <div className={`font-medium flex-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                          {renderText(item.text)}
+                        </div>
                       </div>
                       {isMatched && (
                         <div className="flex items-center gap-2">
@@ -287,9 +326,9 @@ const MatchingQuestion = ({ question, answer, onChange, isDark }) => {
                       }
                     `}
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-start gap-3">
                       <span className={`
-                        font-bold text-lg
+                        font-bold text-lg flex-shrink-0 mt-1
                         ${isMatched
                           ? isDark ? 'text-green-400' : 'text-green-600'
                           : isDark ? 'text-blue-400' : 'text-blue-600'
@@ -297,10 +336,10 @@ const MatchingQuestion = ({ question, answer, onChange, isDark }) => {
                       `}>
                         {index + 1}.
                       </span>
-                      <span className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                        {item.text}
-                      </span>
-                      {isMatched && <Check className="w-5 h-5 text-green-500 ml-auto" />}
+                      <div className={`font-medium flex-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                        {renderText(item.text)}
+                      </div>
+                      {isMatched && <Check className="w-5 h-5 text-green-500 ml-auto flex-shrink-0 mt-1" />}
                     </div>
                   </div>
                 );

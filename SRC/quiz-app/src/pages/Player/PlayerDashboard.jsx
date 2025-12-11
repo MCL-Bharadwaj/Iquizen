@@ -279,7 +279,19 @@ const PlayerDashboard = ({ isDark }) => {
           </div>
           {recentAttempts.length > 0 ? (
             <div className="space-y-3">
-              {recentAttempts.map((attempt) => (
+              {recentAttempts.map((attempt) => {
+                const handleStatusClick = (e) => {
+                  e.stopPropagation();
+                  if (attempt.status === 'in_progress') {
+                    // Redirect to continue the quiz
+                    navigate(`/Player/quiz/${attempt.quizId}?attemptId=${attempt.attemptId}`);
+                  } else if (attempt.status === 'completed') {
+                    // Redirect to view attempt details
+                    navigate(`/Player/attempt/${attempt.attemptId}`);
+                  }
+                };
+
+                return (
                 <div
                   key={attempt.attemptId}
                   className={`p-4 rounded-xl ${isDark ? 'bg-gray-700' : 'bg-gray-50'}`}
@@ -293,13 +305,17 @@ const PlayerDashboard = ({ isDark }) => {
                         {new Date(attempt.startedAt).toLocaleDateString()} at {new Date(attempt.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </div>
                     </div>
-                    <span className={`text-xs px-2 py-1 rounded ${
-                      attempt.status === 'completed' 
-                        ? 'bg-green-500/20 text-green-400'
-                        : 'bg-blue-500/20 text-blue-400'
-                    }`}>
+                    <button
+                      onClick={handleStatusClick}
+                      className={`text-xs px-2 py-1 rounded transition-all duration-200 cursor-pointer ${
+                        attempt.status === 'completed' 
+                          ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30 hover:scale-105'
+                          : 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 hover:scale-105'
+                      }`}
+                      title={attempt.status === 'in_progress' ? 'Click to continue quiz' : 'Click to view details'}
+                    >
                       {attempt.status}
-                    </span>
+                    </button>
                   </div>
                   {attempt.status === 'completed' && attempt.scorePercentage !== null && (
                     <div className="flex items-center gap-2 mt-2">
@@ -312,7 +328,8 @@ const PlayerDashboard = ({ isDark }) => {
                     </div>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-8">

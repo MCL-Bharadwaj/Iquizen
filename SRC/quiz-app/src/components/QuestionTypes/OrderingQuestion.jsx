@@ -30,12 +30,14 @@ const OrderingQuestion = ({ question, answer, onChange, isDark }) => {
 
   const [draggedItem, setDraggedItem] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
+  const [hasInteracted, setHasInteracted] = useState(false);
 
   // Reset state when question changes
   useEffect(() => {
     // Only reset if question actually changed
     if (prevQuestionIdRef.current !== question.questionId) {
       prevQuestionIdRef.current = question.questionId;
+      setHasInteracted(false);
       
       if (answer?.answer) {
         // If there's already an answer, use that order
@@ -57,11 +59,13 @@ const OrderingQuestion = ({ question, answer, onChange, isDark }) => {
     }
   }, [question.questionId, answer]); // Add dependencies to prevent infinite loop
 
-  // Update parent when items change
+  // Update parent when items change (only after user interaction)
   useEffect(() => {
-    const order = items.map(item => item.id);
-    onChange({ order }, null);
-  }, [items]);
+    if (hasInteracted) {
+      const order = items.map(item => item.id);
+      onChange({ order }, null);
+    }
+  }, [items, hasInteracted]);
 
   const handleDragStart = (e, index) => {
     setDraggedItem(index);
@@ -102,6 +106,7 @@ const OrderingQuestion = ({ question, answer, onChange, isDark }) => {
     // Insert at new position
     newItems.splice(dropIndex, 0, draggedItemData);
     
+    setHasInteracted(true);
     setItems(newItems);
     setDragOverIndex(null);
   };

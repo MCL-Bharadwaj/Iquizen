@@ -66,12 +66,14 @@ const FillInBlankDragDrop = ({ question, answer, onChange, isDark }) => {
 
   const [draggedItem, setDraggedItem] = useState(null);
   const [hoveredBlank, setHoveredBlank] = useState(null);
+  const [hasInteracted, setHasInteracted] = useState(false);
 
   // Reset state when question changes
   useEffect(() => {
     // Only reset if question actually changed
     if (prevQuestionIdRef.current !== question.questionId) {
       prevQuestionIdRef.current = question.questionId;
+      setHasInteracted(false);
       
       if (answer?.answer) {
         const answerData = typeof answer.answer === 'string' 
@@ -96,21 +98,23 @@ const FillInBlankDragDrop = ({ question, answer, onChange, isDark }) => {
     }
   });
 
-  // Update parent when selection changes
+  // Update parent when selection changes (only after user interaction)
   useEffect(() => {
-    // Backend expects: {"blanks": [{"position": 1, "selected_id": "op1"}, ...]}
-    // Backend compares selected_id against accepted_answers, which may contain text or id
-    const blanksArray = blanks.map(blank => {
-      const selected = selectedItems[blank.position];
-      return {
-        position: blank.position,
-        selected_id: selected ? selected.text : '' // Send text value for grading
-      };
-    });
-    
-    // Send in the format expected by backend
-    onChange({ blanks: blanksArray });
-  }, [selectedItems]);
+    if (hasInteracted) {
+      // Backend expects: {"blanks": [{"position": 1, "selected_id": "op1"}, ...]}
+      // Backend compares selected_id against accepted_answers, which may contain text or id
+      const blanksArray = blanks.map(blank => {
+        const selected = selectedItems[blank.position];
+        return {
+          position: blank.position,
+          selected_id: selected ? selected.text : '' // Send text value for grading
+        };
+      });
+      
+      // Send in the format expected by backend
+      onChange({ blanks: blanksArray });
+    }
+  }, [selectedItems, hasInteracted]);
 
   // Check if word is already used (if reuse not allowed)
   const isWordUsed = (wordId) => {
@@ -148,6 +152,7 @@ const FillInBlankDragDrop = ({ question, answer, onChange, isDark }) => {
     e.preventDefault();
     if (!draggedItem) return;
     
+    setHasInteracted(true);
     setSelectedItems(prev => ({
       ...prev,
       [blankPosition]: draggedItem
@@ -157,6 +162,7 @@ const FillInBlankDragDrop = ({ question, answer, onChange, isDark }) => {
   };
 
   const handleRemove = (blankPosition) => {
+    setHasInteracted(true);
     setSelectedItems(prev => {
       const newState = { ...prev };
       delete newState[blankPosition];
