@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Loader2, ArrowLeft, User, Calendar, Clock, Award, CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Loader2, ArrowLeft, User, Calendar, Clock, Award, CheckCircle, XCircle, ChevronDown, ChevronUp, Edit2, Save, X } from 'lucide-react';
 import { assignmentApi, quizApi, attemptApi } from '../../services/api';
 import { QuestionText } from '../../components/CodeBlock';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const AssignmentResponsesView = ({ isDark }) => {
   const { assignmentId } = useParams();
@@ -15,6 +17,7 @@ const AssignmentResponsesView = ({ isDark }) => {
   const [attempts, setAttempts] = useState([]);
   const [expandedAttempt, setExpandedAttempt] = useState(null);
   const [attemptResponses, setAttemptResponses] = useState({});
+  const [manualPoints, setManualPoints] = useState({});
 
   useEffect(() => {
     fetchAssignmentData();
@@ -291,6 +294,26 @@ const AssignmentResponsesView = ({ isDark }) => {
                               response={response}
                               index={qIndex}
                               isDark={isDark}
+                              onPointsChange={(responseId, points) => {
+                                // Update the attempt responses with new points
+                                setAttemptResponses(prev => ({
+                                  ...prev,
+                                  [attempt.attemptId]: prev[attempt.attemptId].map(r => 
+                                    r.responseId === responseId || r.questionId === questionId
+                                      ? { ...r, pointsEarned: points }
+                                      : r
+                                  )
+                                }));
+                                
+                                // Optionally update the attempt's total score
+                                setAttempts(prev => 
+                                  prev.map(att => 
+                                    att.attemptId === attempt.attemptId
+                                      ? { ...att, manualScoreUpdated: true }
+                                      : att
+                                  )
+                                );
+                              }}
                             />
                           );
                         })
@@ -308,14 +331,29 @@ const AssignmentResponsesView = ({ isDark }) => {
           </div>
         )}
       </div>
+      <ToastContainer />
     </div>
   );
 };
 
 // Question Review Card Component
-const QuestionReviewCard = ({ question, response, index, isDark }) => {
+const QuestionReviewCard = ({ question, response, index, isDark, onPointsChange }) => {
   const isCorrect = response?.isCorrect;
   const PlayerAnswer = response?.answerPayload;
+  const [isEditingPoints, setIsEditingPoints] = useState(false);
+  const [tempPoints, setTempPoints] = useState(response?.pointsEarned || 0);
+  const maxPoints = question.points || 10;
+
+  const handleSavePoints = () => {
+    const points = Math.min(Math.max(parseFloat(tempPoints) || 0, 0), maxPoints);
+    onPointsChange(response?.responseId, points);
+    setTempPoints(points);
+    setIsEditingPoints(false);
+    toast.success('Points updated successfully!', {
+      position: 'bottom-right',
+      autoClose: 2000,
+    });
+  };
 
   const renderPlayerAnswer = () => {
     if (!PlayerAnswer) {
@@ -630,13 +668,79 @@ const QuestionReviewCard = ({ question, response, index, isDark }) => {
             className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}
           />
         </div>
-        <div className="text-right">
-          <div className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-            {response?.pointsEarned || 0} / {question.points || 10}
-          </div>
-          <div className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-            points
-          </div>
+        
+        {/* Points Section - Editable */}
+        <div className={`text-right p-4 rounded-xl flex items-center gap-3 ${
+          isDark ? 'bg-gray-700' : 'bg-gray-100'
+        }`}>
+          {!isEditingPoints ? (
+            <>
+              <div>
+                <div className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                  {tempPoints} / {maxPoints}
+                </div>
+                <div className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                  points
+                </div>
+              </div>
+              <button
+                onClick={() => setIsEditingPoints(true)}
+                className={`p-2 rounded-lg transition-colors ${
+                  isDark
+                    ? 'hover:bg-blue-600 text-blue-400'
+                    : 'hover:bg-blue-500 text-blue-600'
+                }`}
+                title="Edit points"
+              >
+                <Edit2 className="w-5 h-5" />
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  value={tempPoints}
+                  onChange={(e) => setTempPoints(e.target.value)}
+                  min="0"
+                  max={maxPoints}
+                  className={`w-16 px-2 py-1 rounded-lg border-2 text-center font-bold ${
+                    isDark
+                      ? 'bg-gray-600 border-blue-500 text-white'
+                      : 'bg-white border-blue-400 text-gray-900'
+                  }`}
+                />
+                <span className={`font-bold ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                  / {maxPoints}
+                </span>
+              </div>
+              <button
+                onClick={handleSavePoints}
+                className={`p-2 rounded-lg transition-colors ${
+                  isDark
+                    ? 'hover:bg-green-600 text-green-400'
+                    : 'hover:bg-green-500 text-green-600'
+                }`}
+                title="Save points"
+              >
+                <Save className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => {
+                  setTempPoints(response?.pointsEarned || 0);
+                  setIsEditingPoints(false);
+                }}
+                className={`p-2 rounded-lg transition-colors ${
+                  isDark
+                    ? 'hover:bg-red-600 text-red-400'
+                    : 'hover:bg-red-500 text-red-600'
+                }`}
+                title="Cancel"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </>
+          )}
         </div>
       </div>
 
